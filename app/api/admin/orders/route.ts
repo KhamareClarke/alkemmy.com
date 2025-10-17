@@ -193,7 +193,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('❌ Unexpected error in PATCH handler:', error);
-    console.error('Error stack:', error.stack);
-    return NextResponse.json({ error: 'Internal server error: ' + error.message }, { status: 500 });
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    return NextResponse.json({ error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error') }, { status: 500 });
   }
 }

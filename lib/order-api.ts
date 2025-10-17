@@ -169,7 +169,7 @@ export async function createOrder(
     console.error('Order data:', orderData);
     console.error('Cart items:', cartItems);
     console.error('User ID:', userId);
-    throw new Error(`Failed to create order: ${error.message || error}`);
+    throw new Error(`Failed to create order: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

@@ -62,19 +62,19 @@ export default function RollOnsPage() {
         filtered = filtered.filter(product => {
           switch (filterName) {
             case 'Skin Type':
-              return selectedValues.includes(product.skin_type || '');
+              return selectedValues.includes(product.application_area || '');
             case 'Concern':
               return selectedValues.includes(product.roll_on_type || '');
             case 'Key Ingredient':
-              // Check both predefined texture and custom ingredients in tags/description
-              return selectedValues.includes(product.texture || '') ||
+              // Check both predefined main_ingredient and custom ingredients in tags/description
+              return selectedValues.includes(product.main_ingredient || '') ||
                      selectedValues.some(ingredient => 
                        product.tags?.some(tag => tag.toLowerCase().includes(ingredient.toLowerCase())) ||
                        product.description?.toLowerCase().includes(ingredient.toLowerCase()) ||
                        product.short_description?.toLowerCase().includes(ingredient.toLowerCase())
                      );
             case 'Texture':
-              return selectedValues.includes(product.texture || '');
+              return selectedValues.includes(product.formulation || '');
             default:
               return true;
           }

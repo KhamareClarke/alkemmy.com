@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
           comment: review.comment,
           created_at: review.created_at,
           user: {
-            name: review.profiles?.email?.split('@')[0] || 'Anonymous',
-            email: review.profiles?.email || ''
+            name: (review.profiles as any)?.email?.split('@')[0] || 'Anonymous',
+            email: (review.profiles as any)?.email || ''
           },
           product: product ? {
             title: product.title,

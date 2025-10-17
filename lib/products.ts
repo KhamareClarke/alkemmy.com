@@ -359,7 +359,7 @@ export async function getTags(): Promise<string[]> {
     if (!error && data) {
       data.forEach(item => {
         if (item.tags) {
-          item.tags.forEach(tag => allTags.add(tag));
+          item.tags.forEach((tag: string) => allTags.add(tag));
         }
       });
     }
@@ -378,7 +378,7 @@ export async function getTags(): Promise<string[]> {
       if (!error && data) {
         data.forEach(item => {
           if (item.tags) {
-            item.tags.forEach(tag => allTags.add(tag));
+            item.tags.forEach((tag: string) => allTags.add(tag));
           }
         });
       }

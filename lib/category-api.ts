@@ -13,6 +13,20 @@ import {
   CategoryName
 } from './category-types';
 
+// Re-export types for convenience
+export type { 
+  Soap, 
+  HerbalTea, 
+  Lotion, 
+  Oil, 
+  BeardCare, 
+  Shampoo, 
+  RollOn, 
+  Elixir,
+  CategoryProduct,
+  CategoryName
+};
+
 // Generic filters interface
 export interface CategoryFilters {
   search?: string;

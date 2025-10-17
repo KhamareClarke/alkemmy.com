@@ -344,7 +344,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
           >
             <h2 className="text-3xl font-bold text-gray-900 mb-8">Key Ingredients</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {product.ingredients.map((ingredient: string, index: number) => (
+              {product.ingredients?.map((ingredient: string, index: number) => (
                 <div 
                   key={index} 
                   className="relative group cursor-help bg-white p-4 rounded-xl border border-gray-200 hover:border-[#D4AF37] hover:shadow-lg transition-all duration-200"
@@ -388,7 +388,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
           >
             <h2 className="text-3xl font-bold text-gray-900 mb-8">How to Use</h2>
             <div className="space-y-6">
-              {product.how_to_use.map((step: string, index: number) => (
+              {product.how_to_use?.map((step: string, index: number) => (
                 <div key={index} className="flex items-start space-x-4 bg-white p-6 rounded-xl shadow-md">
                   <div className="w-10 h-10 bg-[#D4AF37] text-black rounded-xl flex items-center justify-center font-bold text-lg flex-shrink-0">
                     {index + 1}

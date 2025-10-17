@@ -64,17 +64,15 @@ export default function ShampoosPage() {
             case 'Hair Type':
               return selectedValues.includes(product.hair_type || '');
             case 'Concern':
-              return selectedValues.includes(product.shampoo_type || '');
+              return selectedValues.includes(product.product_type || '');
             case 'Key Ingredient':
-              // Check both predefined texture and custom ingredients in tags/description
-              return selectedValues.includes(product.texture || '') ||
+              // Check both predefined hair_concern and custom ingredients in tags/description
+              return selectedValues.includes(product.hair_concern || '') ||
                      selectedValues.some(ingredient => 
                        product.tags?.some(tag => tag.toLowerCase().includes(ingredient.toLowerCase())) ||
                        product.description?.toLowerCase().includes(ingredient.toLowerCase()) ||
                        product.short_description?.toLowerCase().includes(ingredient.toLowerCase())
                      );
-            case 'Texture':
-              return selectedValues.includes(product.texture || '');
             default:
               return true;
           }

@@ -425,7 +425,7 @@ export default function ProfilePage() {
                     ) : (
                       <div className="space-y-6">
                         {orders.map((order) => {
-                          const statusInfo = getStatusInfo(order.status, order.payment_status);
+                          const statusInfo = getStatusInfo(order.status, order.payment_status || 'pending');
                           const StatusIcon = statusInfo.icon;
                           
                           return (

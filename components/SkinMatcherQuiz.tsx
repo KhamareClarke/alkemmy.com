@@ -718,14 +718,14 @@ const SkinMatcherQuiz = () => {
                         }`}
                       >
                         <div className="flex items-center gap-4">
-                          {option.icon && (
+                          {'icon' in option && option.icon && (
                             <span className="text-2xl">{option.icon}</span>
                           )}
                           <div className="flex-1">
                             <h3 className="font-semibold text-gray-900 mb-1">
                               {option.label}
                             </h3>
-                            {option.description && (
+                            {'description' in option && option.description && (
                               <p className="text-sm text-gray-600">
                                 {option.description}
                               </p>

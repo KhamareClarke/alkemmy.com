@@ -68,8 +68,8 @@ export default function ElixirsPage() {
                 product.benefits?.some(b => b.toLowerCase().includes(benefit.toLowerCase()))
               );
             case 'Key Ingredient':
-              // Check both predefined texture and custom ingredients in tags/description
-              return selectedValues.includes(product.texture || '') ||
+              // Check both predefined main_ingredient and custom ingredients in tags/description
+              return selectedValues.includes(product.main_ingredient || '') ||
                      selectedValues.some(ingredient => 
                        product.tags?.some(tag => tag.toLowerCase().includes(ingredient.toLowerCase())) ||
                        product.description?.toLowerCase().includes(ingredient.toLowerCase()) ||

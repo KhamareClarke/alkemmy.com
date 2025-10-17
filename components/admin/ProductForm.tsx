@@ -127,7 +127,7 @@ export default function ProductForm({ category, product, onClose, onSave }: Prod
     soap_type: (product as Soap)?.soap_type || '',
     skin_type: (product as Soap)?.skin_type || '',
     scent: (product as Soap)?.scent || '',
-    concern: (product as Soap)?.concern || '',
+    soap_concern: (product as Soap)?.concern || '',
     weight_grams: (product as Soap)?.weight_grams || 0,
     tea_type: (product as HerbalTea)?.tea_type || '',
     benefits: (product as HerbalTea)?.benefits || [],
@@ -138,29 +138,29 @@ export default function ProductForm({ category, product, onClose, onSave }: Prod
     temperature_celsius: (product as HerbalTea)?.temperature_celsius || 0,
     lotion_type: (product as Lotion)?.lotion_type || '',
     spf_level: (product as Lotion)?.spf_level || 0,
-    volume_ml: (product as Lotion)?.volume_ml || 0,
+    lotion_volume_ml: (product as Lotion)?.volume_ml || 0,
     texture: (product as Lotion)?.texture || '',
     oil_type: (product as Oil)?.oil_type || '',
-    application_area: (product as Oil)?.application_area || '',
+    oil_application_area: (product as Oil)?.application_area || '',
     extraction_method: (product as Oil)?.extraction_method || '',
     carrier_oil: (product as Oil)?.carrier_oil || '',
-    product_type: (product as BeardCare)?.product_type || '',
+    beard_product_type: (product as BeardCare)?.product_type || '',
     beard_length: (product as BeardCare)?.beard_length || '',
     hold_strength: (product as BeardCare)?.hold_strength || '',
     fragrance: (product as BeardCare)?.fragrance || '',
-    concern: (product as BeardCare)?.concern || '',
-    product_type: (product as Shampoo)?.product_type || '',
+    beard_concern: (product as BeardCare)?.concern || '',
+    shampoo_product_type: (product as Shampoo)?.product_type || '',
     hair_type: (product as Shampoo)?.hair_type || '',
     hair_concern: (product as Shampoo)?.hair_concern || '',
-    volume_ml: (product as Shampoo)?.volume_ml || 0,
+    shampoo_volume_ml: (product as Shampoo)?.volume_ml || 0,
     sulfate_free: (product as Shampoo)?.sulfate_free || false,
     roll_on_type: (product as RollOn)?.roll_on_type || '',
-    application_area: (product as RollOn)?.application_area || '',
+    roll_on_application_area: (product as RollOn)?.application_area || '',
     concentration: (product as RollOn)?.concentration || '',
     elixir_type: (product as Elixir)?.elixir_type || '',
-    benefits: (product as Elixir)?.benefits || [],
+    elixir_benefits: (product as Elixir)?.benefits || [],
     dosage: (product as Elixir)?.dosage || '',
-    volume_ml: (product as Elixir)?.volume_ml || 0,
+    elixir_volume_ml: (product as Elixir)?.volume_ml || 0,
     alcohol_free: (product as Elixir)?.alcohol_free || true
   });
 
@@ -295,7 +295,7 @@ export default function ProductForm({ category, product, onClose, onSave }: Prod
           soap_type: data.soap_type,
           skin_type: data.skin_type,
           scent: data.scent,
-          concern: data.concern,
+          concern: data.soap_concern,
           weight_grams: data.weight_grams
         };
       case 'teas':
@@ -316,14 +316,14 @@ export default function ProductForm({ category, product, onClose, onSave }: Prod
           lotion_type: data.lotion_type,
           skin_type: data.skin_type,
           spf_level: data.spf_level,
-          volume_ml: data.volume_ml,
+          volume_ml: data.lotion_volume_ml,
           texture: data.texture
         };
       case 'oils':
         return {
           ...baseFields,
           oil_type: data.oil_type,
-          application_area: data.application_area,
+          application_area: data.oil_application_area,
           extraction_method: data.extraction_method,
           carrier_oil: data.carrier_oil,
           volume_ml: data.volume_ml
@@ -331,28 +331,28 @@ export default function ProductForm({ category, product, onClose, onSave }: Prod
       case 'beard-care':
         return {
           ...baseFields,
-          product_type: data.product_type,
+          product_type: data.beard_product_type,
           beard_length: data.beard_length,
           scent: data.scent,
           hold_strength: data.hold_strength,
           fragrance: data.fragrance,
-          concern: data.concern,
+          concern: data.beard_concern,
           volume_ml: data.volume_ml
         };
       case 'shampoos':
         return {
           ...baseFields,
-          product_type: data.product_type,
+          product_type: data.shampoo_product_type,
           hair_type: data.hair_type,
           hair_concern: data.hair_concern,
-          volume_ml: data.volume_ml,
+          volume_ml: data.shampoo_volume_ml,
           sulfate_free: data.sulfate_free
         };
       case 'roll-ons':
         return {
           ...baseFields,
           roll_on_type: data.roll_on_type,
-          application_area: data.application_area,
+          application_area: data.roll_on_application_area,
           scent: data.scent,
           volume_ml: data.volume_ml,
           concentration: data.concentration
@@ -361,9 +361,9 @@ export default function ProductForm({ category, product, onClose, onSave }: Prod
         return {
           ...baseFields,
           elixir_type: data.elixir_type,
-          benefits: data.benefits,
+          benefits: data.elixir_benefits,
           dosage: data.dosage,
-          volume_ml: data.volume_ml,
+          volume_ml: data.elixir_volume_ml,
           alcohol_free: data.alcohol_free
         };
       default:

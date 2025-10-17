@@ -20,8 +20,8 @@ interface BundleFormProps {
 
 interface BundleItem {
   product_id: string;
-  product_name: string;
   quantity: number;
+  product_type: string;
 }
 
 interface Product {
@@ -53,8 +53,8 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
   const [newTag, setNewTag] = useState('');
   const [newBundleItem, setNewBundleItem] = useState({
     product_id: '',
-    product_name: '',
-    quantity: 1
+    quantity: 1,
+    product_type: ''
   });
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -190,8 +190,8 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
       }));
       setNewBundleItem({
         product_id: '',
-        product_name: '',
-        quantity: 1
+        quantity: 1,
+        product_type: ''
       });
     }
   };
@@ -202,7 +202,7 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
       setNewBundleItem(prev => ({
         ...prev,
         product_id: selectedProduct.id,
-        product_name: selectedProduct.title
+        product_type: selectedProduct.category
       }));
     }
   };
@@ -220,7 +220,7 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
     const bundleData: Partial<Bundle> = {
       ...formData,
       price: parseFloat(formData.price) || 0,
-      original_price: formData.original_price ? parseFloat(formData.original_price) : null,
+      original_price: formData.original_price ? parseFloat(formData.original_price) : undefined,
       inventory: parseInt(formData.inventory) || 0,
       bundle_items: formData.bundle_items
     };
@@ -460,7 +460,7 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
                   </div>
                   <div className="flex items-center px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg">
                     <span className="text-sm text-gray-600 truncate">
-                      {newBundleItem.product_name || 'No product selected'}
+                      {availableProducts.find(p => p.id === newBundleItem.product_id)?.title || 'No product selected'}
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -489,7 +489,7 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
                     {formData.bundle_items.map((item, index) => (
                       <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                         <span className="flex-1 text-sm">
-                          {item.product_name} (ID: {item.product_id}) - Qty: {item.quantity}
+                          {availableProducts.find(p => p.id === item.product_id)?.title || `Product ID: ${item.product_id}`} - Qty: {item.quantity}
                         </span>
                         <Button
                           type="button"
