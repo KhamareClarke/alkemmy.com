@@ -1,6 +1,9 @@
 'use client';
 
 import React from 'react';
+
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Sparkles, Heart, Zap, Shield, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';

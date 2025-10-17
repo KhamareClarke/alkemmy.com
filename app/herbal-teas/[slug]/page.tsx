@@ -3,6 +3,9 @@ import { notFound } from 'next/navigation';
 import { getHerbalTeaBySlug, getRelatedHerbalTeas } from '@/lib/category-api';
 import ProductClientPage from './ProductClientPage';
 
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
+
 interface HerbalTeaPageProps {
   params: {
     slug: string;
