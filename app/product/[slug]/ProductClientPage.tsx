@@ -5,19 +5,46 @@ import { motion } from 'framer-motion';
 import { Star, Plus, Minus, ShoppingCart, Heart, Check, Share2, Sparkles, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { getStockStatusText } from '@/lib/utils';
+import AddToCartButton from '@/components/AddToCartButton';
+import StarRating from '@/components/StarRating';
+import ReviewsList from '@/components/ReviewsList';
+import ReviewForm from '@/components/ReviewForm';
 import Link from 'next/link';
+import { Product } from '@/lib/supabase';
 
 interface ProductClientPageProps {
-  product: any;
-  relatedProducts: any[];
+  product: Product;
+  relatedProducts: Product[];
 }
 
 export default function ProductClientPage({ product, relatedProducts }: ProductClientPageProps) {
-  const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
   const [showFloatingCart, setShowFloatingCart] = useState(false);
   const [hoveredIngredient, setHoveredIngredient] = useState<string | null>(null);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+
+  // Fetch reviews data
+  React.useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const response = await fetch(`/api/reviews?productId=${product.id}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+          setAverageRating(data.averageRating || 0);
+          setTotalReviews(data.totalReviews || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+      }
+    };
+
+    fetchReviews();
+  }, [product.id]);
 
   // Handle scroll for floating cart
   React.useEffect(() => {
@@ -80,10 +107,10 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
       >
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] rounded-xl shadow-md flex items-center justify-center">
-            <span className="text-[#D4AF37] font-bold">{product.name.charAt(0)}</span>
+            <span className="text-[#D4AF37] font-bold">{product.title.charAt(0)}</span>
           </div>
           <div>
-            <p className="font-semibold text-gray-900">{product.name}</p>
+            <p className="font-semibold text-gray-900">{product.title}</p>
             <p className="text-[#D4AF37] font-bold">£{product.price}</p>
           </div>
           <div className="flex items-center space-x-2">
@@ -116,7 +143,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
             <span className="text-gray-400">/</span>
             <Link href="/shop" className="text-gray-500 hover:text-[#D4AF37] transition-colors">Shop</Link>
             <span className="text-gray-400">/</span>
-            <span className="text-gray-900 font-medium">{product.name}</span>
+            <span className="text-gray-900 font-medium">{product.title}</span>
           </div>
         </div>
       </div>
@@ -135,7 +162,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
               {/* Main Product Image */}
               <div className="aspect-square bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] rounded-2xl shadow-xl flex items-center justify-center overflow-hidden">
                 <div className="w-64 h-64 bg-[#D4AF37] rounded-full flex items-center justify-center shadow-2xl">
-                  <span className="text-white font-bold text-6xl">{product.name.charAt(0)}</span>
+                  <span className="text-white font-bold text-6xl">{product.title.charAt(0)}</span>
                 </div>
               </div>
               
@@ -149,7 +176,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                       selectedImage === index ? 'border-[#D4AF37] shadow-lg' : 'border-gray-200 hover:border-gray-300'
                     } bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] flex items-center justify-center`}
                   >
-                    <span className="text-[#D4AF37] font-bold">{product.name.charAt(0)}</span>
+                    <span className="text-[#D4AF37] font-bold">{product.title.charAt(0)}</span>
                   </button>
                 ))}
               </div>
@@ -168,18 +195,16 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                   {product.category}
                 </p>
                 <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-                  {product.name}
+                  {product.title}
                 </h1>
               </div>
 
               {/* Rating */}
               <div className="flex items-center space-x-3">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 fill-[#D4AF37] text-[#D4AF37]" />
-                  ))}
-                </div>
-                <span className="text-gray-600 font-medium">({product.reviewCount} reviews)</span>
+                <StarRating rating={averageRating} size="lg" showNumber={true} />
+                <span className="text-gray-600 font-medium">
+                  ({totalReviews} review{totalReviews !== 1 ? 's' : ''})
+                </span>
               </div>
 
               {/* Price */}
@@ -187,7 +212,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
 
               {/* Short Benefit */}
               <p className="text-xl text-gray-700 leading-relaxed mb-6">
-                {product.shortBenefit}
+                {product.short_description}
               </p>
 
               {/* Tags */}
@@ -224,10 +249,21 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
 
               {/* Action Buttons */}
               <div className="flex space-x-4 mb-8">
-                <Button className="flex-1 bg-[#D4AF37] hover:bg-[#B8941F] text-black font-bold py-4 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105">
-                  <ShoppingCart className="w-5 h-5 mr-3" />
-                  Add to Cart
-                </Button>
+                <AddToCartButton
+                  product={{
+                    id: product.id,
+                    title: product.title,
+                    images: product.images,
+                    price: product.price,
+                    category: 'products',
+                    slug: product.slug,
+                    in_stock: product.in_stock,
+                    inventory: product.inventory,
+                  }}
+                  quantity={quantity}
+                  className="flex-1 py-4 text-lg font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                  size="lg"
+                />
                 <button
                   onClick={() => setIsWishlisted(!isWishlisted)}
                   className="p-4 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
@@ -241,8 +277,20 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
 
               {/* Stock Status */}
               <div className="flex items-center space-x-3 mb-8">
-                <Check className="w-6 h-6 text-green-500" />
-                <span className="text-green-600 font-semibold text-lg">In Stock - Ready to Ship</span>
+                {product.in_stock && product.inventory > 0 ? (
+                  <Check className="w-6 h-6 text-green-500" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">!</span>
+                  </div>
+                )}
+                <span className={`font-semibold text-lg ${
+                  product.in_stock && product.inventory > 0 
+                    ? 'text-green-600' 
+                    : 'text-red-600'
+                }`}>
+                  {getStockStatusText(product.in_stock, product.inventory)}
+                </span>
               </div>
 
               {/* AI Find Your Match */}
@@ -255,10 +303,12 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                     <h3 className="font-bold text-gray-900 text-lg">Not sure if this is right for you?</h3>
                     <p className="text-gray-600">Let our AI help you find your perfect match</p>
                   </div>
-                  <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg">
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Find My Match
-                  </Button>
+                  <Link href="/skin-matcher">
+                    <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg">
+                      <Sparkles className="w-5 h-5 mr-2" />
+                      Find My Match
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </motion.div>
@@ -338,7 +388,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
           >
             <h2 className="text-3xl font-bold text-gray-900 mb-8">How to Use</h2>
             <div className="space-y-6">
-              {product.howToUse.map((step: string, index: number) => (
+              {product.how_to_use.map((step: string, index: number) => (
                 <div key={index} className="flex items-start space-x-4 bg-white p-6 rounded-xl shadow-md">
                   <div className="w-10 h-10 bg-[#D4AF37] text-black rounded-xl flex items-center justify-center font-bold text-lg flex-shrink-0">
                     {index + 1}
@@ -351,63 +401,6 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">What Our Customers Say</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  name: "Sarah M.",
-                  review: "I've been using this for 3 months and my skin has never looked better. The natural ingredients really make a difference!",
-                  timeUsed: "3 months of use"
-                },
-                {
-                  name: "James K.",
-                  review: "Finally found a product that works for my sensitive skin. No irritation and leaves my skin feeling amazing.",
-                  timeUsed: "6 weeks of use"
-                },
-                {
-                  name: "Emma L.",
-                  review: "The quality is outstanding and you can really feel the difference. Worth every penny for such premium ingredients.",
-                  timeUsed: "2 months of use"
-                }
-              ].map((testimonial, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100"
-                >
-                  <div className="flex items-center mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 fill-[#D4AF37] text-[#D4AF37]" />
-                    ))}
-                  </div>
-                  <p className="text-gray-700 mb-6 italic text-lg">"{testimonial.review}"</p>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-[#D4AF37] rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold">{testimonial.name.charAt(0)}</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                      <p className="text-sm text-gray-500">{testimonial.timeUsed}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      </section>
 
       {/* FAQ Section */}
       <section className="py-16 bg-gray-50">
@@ -456,6 +449,44 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
         </div>
       </section>
 
+      {/* Reviews Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Reviews List */}
+              <div className="lg:col-span-2">
+                <ReviewsList productId={product.id} />
+              </div>
+              
+              {/* Review Form */}
+              <div>
+                <ReviewForm 
+                  productId={product.id} 
+                  onReviewSubmitted={() => {
+                    // Refresh reviews data
+                    fetch(`/api/reviews?productId=${product.id}`)
+                      .then(res => res.json())
+                      .then(data => {
+                        if (data.averageRating !== undefined) {
+                          setAverageRating(data.averageRating);
+                          setTotalReviews(data.totalReviews);
+                        }
+                      })
+                      .catch(console.error);
+                  }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Related Products Section */}
       <section className="py-16">
         <div className="max-w-6xl mx-auto px-4">
@@ -478,12 +509,12 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                 >
                   <div className="aspect-square bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] flex items-center justify-center">
                     <div className="w-24 h-24 bg-[#D4AF37] rounded-full flex items-center justify-center shadow-lg">
-                      <span className="text-white font-bold text-xl">{relatedProduct.name.charAt(0)}</span>
+                      <span className="text-white font-bold text-xl">{relatedProduct.title.charAt(0)}</span>
                     </div>
                   </div>
                   <div className="p-6">
                     <h3 className="font-bold text-xl text-gray-900 mb-3 group-hover:text-[#D4AF37] transition-colors">
-                      {relatedProduct.name}
+                      {relatedProduct.title}
                     </h3>
                     <div className="flex items-center justify-between mb-6">
                       <span className="text-2xl font-bold text-[#D4AF37]">£{relatedProduct.price}</span>

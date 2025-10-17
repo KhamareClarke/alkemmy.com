@@ -1,359 +1,347 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Package, Truck, Heart, ArrowRight, Star, Gift } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, Package, Truck, Mail, ArrowLeft, Home } from 'lucide-react';
+import { useCart } from '@/lib/cart-context';
+import { getOrderById } from '@/lib/order-api';
+import Image from 'next/image';
+
+interface OrderDetails {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  payment_method: string;
+  payment_status: string;
+  created_at: string;
+  shipping_address: any;
+  order_items: any[];
+}
 
 export default function ThankYouPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { dispatch } = useCart();
+  const [order, setOrder] = useState<OrderDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const orderId = searchParams.get('order_id');
+
+  useEffect(() => {
+    if (orderId) {
+      loadOrderDetails(orderId);
+    } else {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  const loadOrderDetails = async (id: string) => {
+    try {
+      const orderData = await getOrderById(id);
+      if (orderData) {
+        setOrder(orderData as unknown as OrderDetails);
+      } else {
+        setError('Order not found');
+      }
+    } catch (err) {
+      setError('Failed to load order details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinueShopping = () => {
+    // Clear the cart
+    dispatch({ type: 'CLEAR_CART' });
+    router.push('/shop');
+  };
+
+  const handleGoHome = () => {
+    // Clear the cart
+    dispatch({ type: 'CLEAR_CART' });
+    router.push('/');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading order details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h1>
+          <p className="text-gray-600 mb-6">
+            Thank you for your order! We've received your order and will process it shortly. 
+            You'll receive a confirmation email with your order details.
+          </p>
+          <div className="space-x-4">
+            <Button onClick={handleGoHome} variant="outline">
+              <Home className="w-4 h-4 mr-2" />
+              Go Home
+            </Button>
+            <Button onClick={() => router.push('/shop')}>
+              Continue Shopping
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      {/* Confirmation Header */}
-      <section className="bg-gradient-to-r from-[#D4AF37] to-[#B8941F] text-black py-20">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+    <div className="min-h-screen bg-white">
+      {/* Header Section */}
+      <section className="bg-gradient-to-r from-[#D4AF37] to-[#B8941F] text-black py-16">
+        <div className="max-w-7xl mx-auto px-4 text-center">
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            {/* Success Icon with Animation */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.5, type: "spring", stiffness: 200 }}
-              className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl"
-            >
-              <Check className="w-12 h-12 text-[#D4AF37]" />
-            </motion.div>
-
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              Thank You for Your Order 🙌
-            </h1>
-            <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-2xl mx-auto">
-              Your Alkhemmy package is being prepared with care and intention.
-            </p>
-            
-            {/* Confetti Emojis */}
-            <div className="flex justify-center space-x-4 text-3xl mb-8">
-              <motion.span
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: 0 }}
-              >
-                🎉
-              </motion.span>
-              <motion.span
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
-              >
-                ✨
-              </motion.span>
-              <motion.span
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
-              >
-                🌿
-              </motion.span>
+            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+              Thank You for Your Order!
+            </h1>
+            <p className="text-xl opacity-90">
+              Your order has been confirmed and is being processed.
+            </p>
           </motion.div>
         </div>
       </section>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          
-          {/* Left Column - Order Summary */}
+      <div className="max-w-4xl mx-auto px-4 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Order Summary */}
+          <div className="lg:col-span-2 space-y-6">
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="space-y-8"
-          >
-            {/* Order Details Card */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">Order Summary</h2>
-              
-              {/* Order ID */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <p className="text-sm text-gray-600 mb-1">Order ID</p>
-                <p className="text-xl font-bold text-[#D4AF37]">#AK-384729</p>
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Order Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Order Number</span>
+                      <span className="font-mono font-semibold">{order.order_number}</span>
               </div>
-
-              {/* Order Items */}
-              <div className="space-y-4 mb-6">
-                <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] rounded-xl flex items-center justify-center">
-                      <span className="text-[#D4AF37] font-bold">E</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Order Date</span>
+                      <span>{new Date(order.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Empire Bar</p>
-                      <p className="text-sm text-gray-600">Quantity: 2</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Payment Method</span>
+                      <span className="capitalize">{order.payment_method.replace('_', ' ')}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Status</span>
+                      <Badge variant={order.status === 'processing' ? 'default' : 'secondary'}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center text-lg font-bold">
+                      <span>Total</span>
+                      <span className="text-[#D4AF37]">£{order.total_amount.toFixed(2)}</span>
                     </div>
                   </div>
-                  <p className="font-bold text-gray-900">£24.00</p>
-                </div>
-                
-                <div className="flex items-center justify-between py-3 border-b border-gray-100">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] rounded-xl flex items-center justify-center">
-                      <span className="text-[#D4AF37] font-bold">S</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">Skin Rescue Bar</p>
-                      <p className="text-sm text-gray-600">Quantity: 1</p>
-                    </div>
-                  </div>
-                  <p className="font-bold text-gray-900">£14.00</p>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-              {/* Order Totals */}
-              <div className="space-y-3 pt-4 border-t border-gray-200">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">£38.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium">£4.99</span>
-                </div>
-                <div className="flex justify-between text-xl font-bold pt-3 border-t border-gray-200">
-                  <span className="text-gray-900">Total</span>
-                  <span className="text-[#D4AF37]">£42.99</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Shipping Address */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Shipping Address</h3>
-              <div className="text-gray-700 space-y-1">
-                <p className="font-semibold">Sarah Johnson</p>
-                <p>123 Wellness Street</p>
-                <p>London, SW1A 1AA</p>
-                <p>United Kingdom</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Right Column - What's Next */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="space-y-8"
-          >
-            {/* Expected Delivery */}
+            {/* Order Items */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100 p-8"
+              transition={{ duration: 0.6, delay: 0.1 }}
             >
-              <div className="flex items-center justify-center space-x-4">
-                <Truck className="w-8 h-8 text-green-600" />
-                <div className="text-center">
-                  <h3 className="font-bold text-gray-900 text-xl mb-2">Expected Delivery</h3>
-                  <p className="text-2xl font-bold text-green-600">2–3 Working Days</p>
-                  <p className="text-gray-600 mt-2">Your natural luxury is on its way</p>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Items Ordered</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {order.order_items.map((item) => (
+                      <div key={item.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="w-16 h-16 bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] rounded-lg flex items-center justify-center flex-shrink-0">
+                          {item.product_image ? (
+                            <Image
+                              src={item.product_image}
+                              alt={item.product_name}
+                              width={48}
+                              height={48}
+                              className="rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-[#D4AF37] rounded-full flex items-center justify-center">
+                              <span className="text-white font-bold text-sm">{item.product_name.charAt(0)}</span>
+                </div>
+                          )}
+              </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 truncate">{item.product_name}</h3>
+                          <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                </div>
+                        
+                        <div className="text-right">
+                          <p className="font-semibold text-gray-900">£{(item.price * item.quantity).toFixed(2)}</p>
                 </div>
               </div>
+                    ))}
+            </div>
+                </CardContent>
+              </Card>
             </motion.div>
 
-            {/* What Happens Next */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">What Happens Now?</h3>
-              
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-[#D4AF37] rounded-full flex items-center justify-center flex-shrink-0">
-                    <Package className="w-6 h-6 text-black" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">📦 Your items are being packaged</h4>
-                    <p className="text-gray-600">We're carefully preparing your natural skincare products with love and attention to detail.</p>
-                  </div>
+            {/* Shipping Address */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Truck className="w-5 h-5" />
+                    Shipping Address
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-gray-700">
+                    <p className="font-medium">
+                      {order.shipping_address.first_name} {order.shipping_address.last_name}
+                    </p>
+                    <p>{order.shipping_address.address_line_1}</p>
+                    {order.shipping_address.address_line_2 && (
+                      <p>{order.shipping_address.address_line_2}</p>
+                    )}
+                    <p>
+                      {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}
+                    </p>
+                    <p>{order.shipping_address.country}</p>
+                    {order.shipping_address.phone && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        Phone: {order.shipping_address.phone}
+                      </p>
+                    )}
+                </div>
+                </CardContent>
+              </Card>
+            </motion.div>
                 </div>
                 
-                <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Check className="w-6 h-6 text-white" />
+          {/* Right Sidebar */}
+          <div className="lg:col-span-1">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="space-y-6"
+            >
+              {/* Next Steps */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>What's Next?</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-[#D4AF37] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-white text-xs font-bold">1</span>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">✉️ You'll receive a confirmation email shortly</h4>
-                    <p className="text-gray-600">Check your inbox for complete order details and receipt.</p>
-                  </div>
+                      <p className="font-medium">Order Confirmation</p>
+                      <p className="text-sm text-gray-600">You'll receive an email confirmation shortly</p>
+                    </div>
                 </div>
                 
-                <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Truck className="w-6 h-6 text-white" />
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-[#D4AF37] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-white text-xs font-bold">2</span>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">🚚 You'll get tracking info when it ships</h4>
-                    <p className="text-gray-600">Track your package every step of the way to your door.</p>
-                  </div>
-                </div>
-              </div>
+                      <p className="font-medium">Processing</p>
+                      <p className="text-sm text-gray-600">We'll prepare your order for dispatch</p>
+                    </div>
             </div>
 
-            {/* Email Confirmation */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 p-8">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                  <Check className="w-6 h-6 text-white" />
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-[#D4AF37] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-white text-xs font-bold">3</span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900">Confirmation Email Sent</h3>
-                  <p className="text-gray-600">Check your inbox for order details and tracking information.</p>
+                      <p className="font-medium">Dispatch</p>
+                      <p className="text-sm text-gray-600">Your order will be dispatched within 1-2 days</p>
                 </div>
               </div>
-            </div>
+                </CardContent>
+              </Card>
 
-            {/* Special Offer */}
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-100 p-8">
-              <div className="flex items-center space-x-4 mb-4">
-                <Gift className="w-8 h-8 text-purple-600" />
-                <div>
-                  <h3 className="font-bold text-gray-900">First-Time Customer?</h3>
-                  <p className="text-gray-600 mb-4">Join our community and get 15% off your next order plus exclusive wellness tips.</p>
-                  <Button className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-2 rounded-full">
-                    Join the Community
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Post-Purchase CTA Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="mt-16 bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center"
-        >
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Get the Most from Your Products</h2>
-          <p className="text-gray-600 mb-8 text-lg">
-            Maximize your skincare results with expert guidance and discover more natural luxury
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button className="bg-[#D4AF37] hover:bg-[#B8941F] text-black font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105">
-              View Usage Guides
-            </Button>
-            <Link href="/shop">
-              <Button className="bg-[#D4AF37] hover:bg-[#B8941F] text-black font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105">
-                Explore More Products
-              </Button>
-            </Link>
-            <Button 
-              onClick={() => window.open('https://instagram.com/alkhemmy.skin', '_blank')}
-              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-            >
-              Follow Us on Instagram
-            </Button>
+              {/* Contact Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="w-5 h-5" />
+                    Need Help?
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600 mb-4">
+                    If you have any questions about your order, please contact us:
+                  </p>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Email:</strong> support@alkemmy.com</p>
+                    <p><strong>Phone:</strong> +44 20 1234 5678</p>
+                    <p><strong>Hours:</strong> Mon-Fri 9AM-6PM GMT</p>
           </div>
-        </motion.section>
+                </CardContent>
+              </Card>
 
-        {/* Social Share / Brand Loyalty Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-          className="mt-12 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-2xl border border-yellow-200 p-8 text-center"
-        >
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">Loved your experience? Tell your friends!</h3>
-          <p className="text-gray-600 mb-6 text-lg">
-            Share the love and help others discover the power of natural skincare
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {/* Action Buttons */}
+              <div className="space-y-3">
             <Button 
-              onClick={() => window.open('https://instagram.com/alkhemmy.skin', '_blank')}
-              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                  onClick={handleContinueShopping}
+                  className="w-full bg-[#D4AF37] hover:bg-[#B8941F] text-black font-semibold"
             >
-              <Heart className="w-5 h-5 mr-2" />
-              Share on Instagram
+                  Continue Shopping
             </Button>
             <Button 
-              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                  onClick={handleGoHome}
+                  variant="outline"
+                  className="w-full"
             >
-              <Star className="w-5 h-5 mr-2" />
-              Leave a Review
+                  <Home className="w-4 h-4 mr-2" />
+                  Go Home
             </Button>
-          </div>
-        </motion.section>
-
-        {/* Customer Testimonial */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.9 }}
-          className="mt-16 bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center"
-        >
-          <div className="max-w-3xl mx-auto">
-            <div className="flex justify-center mb-4">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-6 h-6 fill-[#D4AF37] text-[#D4AF37]" />
-              ))}
-            </div>
-            <blockquote className="text-xl text-gray-700 italic mb-6">
-              "I've been using Alkhemmy products for 6 months now and my skin has never looked better. The natural ingredients really make a difference, and the quality is outstanding. Worth every penny!"
-            </blockquote>
-            <div className="flex items-center justify-center space-x-3">
-              <div className="w-12 h-12 bg-[#D4AF37] rounded-full flex items-center justify-center">
-                <span className="text-white font-bold">M</span>
               </div>
-              <div>
-                <p className="font-semibold text-gray-900">Maria K.</p>
-                <p className="text-sm text-gray-600">Verified Customer</p>
-              </div>
-            </div>
+            </motion.div>
           </div>
-        </motion.section>
-
-        {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-          className="mt-12 flex flex-col sm:flex-row gap-4 justify-center"
-        >
-          <Link href="/shop">
-            <Button className="bg-[#D4AF37] hover:bg-[#B8941F] text-black font-semibold px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105">
-              <ArrowRight className="w-5 h-5 mr-2" />
-              Continue Shopping
-            </Button>
-          </Link>
-          <Link href="/">
-            <Button variant="outline" className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold px-8 py-3 rounded-full">
-              Back to Home
-            </Button>
-          </Link>
-        </motion.div>
-
-        {/* Support Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.1 }}
-          className="mt-16 text-center"
-        >
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Need Help?</h3>
-          <p className="text-gray-600 mb-6">
-            Our customer care team is here to help with any questions about your order.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="mailto:hello@alkhemmy.com" className="text-[#D4AF37] hover:text-[#B8941F] font-semibold">
-              hello@alkhemmy.com
-            </a>
-            <span className="hidden sm:inline text-gray-400">|</span>
-            <a href="tel:+44123456789" className="text-[#D4AF37] hover:text-[#B8941F] font-semibold">
-              +44 123 456 789
-            </a>
           </div>
-        </motion.div>
       </div>
     </div>
   );

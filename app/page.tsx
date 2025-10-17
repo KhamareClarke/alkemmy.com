@@ -3,12 +3,25 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Menu, X, ShoppingCart, Leaf, Droplets, Sparkles, Heart, Star, ArrowRight, Check, Instagram, Facebook, Bot, Zap } from 'lucide-react';
+import { Menu, X, ShoppingCart, Leaf, Droplets, Sparkles, Heart, Star, ArrowRight, Check, Instagram, Facebook, Bot, Zap, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ProductBadge from '@/components/ProductBadge';
+import CartButton from '@/components/CartButton';
+import AddToCartButton from '@/components/AddToCartButton';
+import BundlesSection from '@/components/BundlesSection';
+import { useAuth } from '@/lib/auth-context';
+import { getAllProducts } from '@/lib/products';
+import { Product } from '@/lib/supabase';
+import Link from 'next/link';
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [recentReviews, setRecentReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,6 +29,48 @@ export default function Home() {
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch featured products from database
+  useEffect(() => {
+    const fetchFeaturedProducts = async () => {
+      try {
+        setLoading(true);
+        const products = await getAllProducts();
+        // Get 4 random products or products with high ratings
+        const featured = products
+          .filter(product => product.in_stock)
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+          .slice(0, 4);
+        setFeaturedProducts(featured);
+      } catch (error) {
+        console.error('Error fetching featured products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeaturedProducts();
+  }, []);
+
+  // Fetch recent reviews from database
+  useEffect(() => {
+    const fetchRecentReviews = async () => {
+      try {
+        setReviewsLoading(true);
+        const response = await fetch('/api/reviews/recent?limit=3');
+        const data = await response.json();
+        if (data.reviews) {
+          setRecentReviews(data.reviews);
+        }
+      } catch (error) {
+        console.error('Error fetching recent reviews:', error);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchRecentReviews();
   }, []);
 
   const navItems = ['Home', 'Shop', 'Bundles', 'About', 'Contact'];
@@ -27,7 +82,7 @@ export default function Home() {
       description: 'Natural bar soaps for every skin type',
       icon: '🧼',
       gradient: 'from-amber-50 to-amber-100',
-      link: '/shop#soaps'
+      link: '/soaps'
     },
     {
       id: 2,
@@ -35,7 +90,7 @@ export default function Home() {
       description: 'Wellness blends for mind and body',
       icon: '🍃',
       gradient: 'from-green-50 to-green-100',
-      link: '/shop#teas'
+      link: '/herbal-teas'
     },
     {
       id: 3,
@@ -43,7 +98,7 @@ export default function Home() {
       description: 'Nourishing creams and moisturizers',
       icon: '🧴',
       gradient: 'from-blue-50 to-blue-100',
-      link: '/shop#lotions'
+      link: '/lotions'
     },
     {
       id: 4,
@@ -51,7 +106,7 @@ export default function Home() {
       description: 'Cold-pressed oils for deep nourishment',
       icon: '💧',
       gradient: 'from-purple-50 to-purple-100',
-      link: '/shop#oils'
+      link: '/oils'
     },
     {
       id: 5,
@@ -59,7 +114,7 @@ export default function Home() {
       description: 'Complete grooming solutions for men',
       icon: '🧔',
       gradient: 'from-orange-50 to-orange-100',
-      link: '/shop#beard'
+      link: '/beard-care'
     },
     {
       id: 6,
@@ -67,7 +122,7 @@ export default function Home() {
       description: 'Gentle cleansing for healthy hair',
       icon: '🚿',
       gradient: 'from-teal-50 to-teal-100',
-      link: '/shop#hair'
+      link: '/shampoos'
     },
     {
       id: 7,
@@ -75,7 +130,7 @@ export default function Home() {
       description: 'Targeted treatments on-the-go',
       icon: '⚡',
       gradient: 'from-pink-50 to-pink-100',
-      link: '/shop#rollons'
+      link: '/roll-ons'
     },
     {
       id: 8,
@@ -83,66 +138,28 @@ export default function Home() {
       description: 'Concentrated herbal wellness shots',
       icon: '🌟',
       gradient: 'from-indigo-50 to-indigo-100',
-      link: '/shop#elixirs'
+      link: '/elixirs'
     }
   ];
 
-  const featuredProducts = [
-    {
-      id: 1,
-      name: 'Empire Bar',
-      benefit: 'Confidence in every cleanse',
-      price: '£12',
-      originalPrice: '£15',
-      badge: 'Bestseller',
-      image: 'https://images.pexels.com/photos/6621487/pexels-photo-6621487.jpeg?auto=compress&cs=tinysrgb&w=800'
-    },
-    {
-      id: 2,
-      name: 'Magnet Bar',
-      benefit: 'Draws out impurities naturally',
-      price: '£15',
-      badge: 'New',
-      image: 'https://images.pexels.com/photos/7755552/pexels-photo-7755552.jpeg?auto=compress&cs=tinysrgb&w=800'
-    },
-    {
-      id: 3,
-      name: 'Skin Rescue Bar',
-      benefit: 'Gentle healing for sensitive skin',
-      price: '£14',
-      badge: 'Popular',
-      image: 'https://images.pexels.com/photos/7755408/pexels-photo-7755408.jpeg?auto=compress&cs=tinysrgb&w=800'
-    },
-    {
-      id: 4,
-      name: 'Fat Loss Tea',
-      benefit: 'Natural metabolism support',
-      price: '£18',
-      badge: 'Trending',
-      image: 'https://images.pexels.com/photos/1638280/pexels-photo-1638280.jpeg?auto=compress&cs=tinysrgb&w=800'
-    }
-  ];
+  // Helper function to get product badge based on rating and other factors
+  const getProductBadge = (product: Product, index: number) => {
+    if (product.rating && product.rating >= 4.5) return 'Bestseller';
+    if (index === 0) return 'Popular';
+    if (index === 1) return 'New';
+    if (index === 2) return 'Trending';
+    return 'Featured';
+  };
 
-  const testimonials = [
-    {
-      name: 'Tasha, Birmingham',
-      quote: 'The Empire Bar completely transformed my skin. I get compliments daily now!',
-      rating: 5,
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150'
-    },
-    {
-      name: 'Marcus, London',
-      quote: 'Finally found beard care that actually works. The oils are incredible.',
-      rating: 5,
-      avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=150'
-    },
-    {
-      name: 'Priya, Manchester',
-      quote: 'The herbal teas have become part of my daily wellness routine. Love them!',
-      rating: 5,
-      avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150'
-    }
-  ];
+  // Helper function to get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -192,7 +209,7 @@ export default function Home() {
                 {navItems.map((item, index) => (
                   <motion.a
                     key={item}
-                    href="#"
+                    href={item === 'Bundles' ? '/bundles' : item === 'Shop' ? '/shop' : item === 'About' ? '/about' : item === 'Contact' ? '/contact' : '#'}
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 + index * 0.1 }}
@@ -202,27 +219,71 @@ export default function Home() {
                     <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#D4AF37] transition-all duration-300 group-hover:w-full"></span>
                   </motion.a>
                 ))}
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.7 }}
-                  className="group relative text-[#1E1E1E] hover:text-[#D4AF37] transition-colors duration-300 p-2 flex items-center gap-2 bg-gradient-to-r from-[#D4AF37]/10 to-[#6C7A61]/10 rounded-full px-4 py-2 border border-[#D4AF37]/20 hover:border-[#D4AF37]/40"
-                >
-                  <Bot className="h-5 w-5" />
-                  <span className="text-sm font-semibold">AI Matcher</span>
-                  <Zap className="h-4 w-4 text-[#D4AF37]" />
-                </motion.button>
-                <motion.button
+                <Link href="/skin-matcher">
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.7 }}
+                    className="group relative text-[#1E1E1E] hover:text-[#D4AF37] transition-colors duration-300 p-2 flex items-center gap-2 bg-gradient-to-r from-[#D4AF37]/10 to-[#6C7A61]/10 rounded-full px-4 py-2 border border-[#D4AF37]/20 hover:border-[#D4AF37]/40"
+                  >
+                    <Bot className="h-5 w-5" />
+                    <span className="text-sm font-semibold">AI Matcher</span>
+                    <Zap className="h-4 w-4 text-[#D4AF37]" />
+                  </motion.button>
+                </Link>
+                <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.8 }}
-                  className="relative text-[#1E1E1E] hover:text-[#D4AF37] transition-colors duration-300 p-2"
                 >
-                  <ShoppingCart className="h-6 w-6" />
-                  <span className="absolute -top-2 -right-2 bg-[#D4AF37] text-[#000000] text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-                    0
-                  </span>
-                </motion.button>
+                  <CartButton className="text-[#1E1E1E] hover:text-[#D4AF37] transition-colors duration-300" />
+                </motion.div>
+                {user ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.9 }}
+                    className="flex items-center space-x-2"
+                  >
+                    <Link href="/profile">
+                      <Button
+                        variant="outline"
+                        className="border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Profile
+                      </Button>
+                    </Link>
+                    <Button
+                      onClick={signOut}
+                      variant="ghost"
+                      className="text-[#1E1E1E] hover:text-red-600"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.9 }}
+                    className="flex items-center space-x-2"
+                  >
+                    <Link href="/auth/login">
+                      <Button
+                        variant="outline"
+                        className="border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black"
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/auth/register">
+                      <Button className="bg-[#D4AF37] hover:bg-[#B8941F] text-black">
+                        Sign Up
+                      </Button>
+                    </Link>
+                  </motion.div>
+                )}
               </div>
             </div>
 
@@ -250,17 +311,61 @@ export default function Home() {
               {navItems.map((item) => (
                 <a
                   key={item}
-                  href="#"
+                  href={item === 'Bundles' ? '/bundles' : item === 'Shop' ? '/shop' : item === 'About' ? '/about' : item === 'Contact' ? '/contact' : '#'}
                   className="text-[#1E1E1E] hover:text-[#D4AF37] block px-4 py-3 text-base font-semibold transition-colors duration-300 rounded-lg hover:bg-[#F4EBD0]/50"
                 >
                   {item}
                 </a>
               ))}
-              <div className="px-4 py-3">
+              <Link href="/skin-matcher" className="block">
+                <div className="flex items-center text-[#1E1E1E] hover:text-[#D4AF37] px-4 py-3 text-base font-semibold transition-colors duration-300 rounded-lg hover:bg-[#F4EBD0]/50">
+                  <Bot className="h-5 w-5 mr-2" />
+                  <span>AI Matcher</span>
+                  <Zap className="h-4 w-4 ml-auto text-[#D4AF37]" />
+                </div>
+              </Link>
+              <div className="px-4 py-3 space-y-3">
                 <div className="flex items-center text-[#1E1E1E]">
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   <span className="font-semibold">Cart (0)</span>
                 </div>
+                {user ? (
+                  <div className="space-y-2">
+                    <Link href="/profile" className="block">
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Profile
+                      </Button>
+                    </Link>
+                    <Button
+                      onClick={signOut}
+                      variant="ghost"
+                      className="w-full text-[#1E1E1E] hover:text-red-600"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Link href="/auth/login" className="block">
+                      <Button
+                        variant="outline"
+                        className="w-full border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black"
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/auth/register" className="block">
+                      <Button className="w-full bg-[#D4AF37] hover:bg-[#B8941F] text-black">
+                        Sign Up
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -337,6 +442,7 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 0.8 }}
               className="flex flex-col sm:flex-row gap-6 justify-center"
             >
+              <Link href="/shop">
               <Button 
                 size="lg" 
                 className="group bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] hover:from-[#6C7A61] hover:to-[#D4AF37] text-[#000000] font-bold px-10 py-4 text-lg transition-all duration-500 transform hover:scale-105 shadow-xl hover:shadow-2xl rounded-full"
@@ -344,6 +450,7 @@ export default function Home() {
                 Shop All Products
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
+              </Link>
               <Button 
                 variant="outline" 
                 size="lg"
@@ -434,68 +541,82 @@ export default function Home() {
             </h2>
           </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featuredProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -15 }}
-                className="group bg-white rounded-2xl shadow-lg p-8 transition-all duration-500 hover:shadow-2xl border border-[#D4AF37]/10 relative overflow-hidden"
-              >
-                {/* Badge */}
-                <div className="absolute top-4 right-4 z-10">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    product.badge === 'Bestseller' ? 'bg-[#D4AF37] text-[#000000]' :
-                    product.badge === 'New' ? 'bg-[#6C7A61] text-white' :
-                    product.badge === 'Popular' ? 'bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] text-[#000000]' :
-                    'bg-[#000000] text-white'
-                  }`}>
-                    {product.badge}
-                  </span>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {[...Array(4)].map((_, index) => (
+                <div key={index} className="bg-white rounded-2xl shadow-lg p-8 animate-pulse">
+                  <div className="aspect-square mb-8 bg-gray-200 rounded-xl"></div>
+                  <div className="space-y-4">
+                    <div className="h-6 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-8 bg-gray-200 rounded"></div>
+                    <div className="h-12 bg-gray-200 rounded"></div>
+                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {featuredProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  viewport={{ once: true }}
+                  whileHover={{ y: -15 }}
+                  className="group bg-white rounded-2xl shadow-lg p-8 transition-all duration-500 hover:shadow-2xl border border-[#D4AF37]/10 relative overflow-hidden"
+                >
+                  {/* Badge */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <ProductBadge badge={getProductBadge(product, index).toLowerCase().replace(/\s+/g, '_')} />
+                  </div>
 
-                <div className="aspect-square mb-8 overflow-hidden rounded-xl relative">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#000000]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-                
-                <div className="text-center space-y-4">
-                  <h3 className="text-xl font-bold text-[#000000] group-hover:text-[#D4AF37] transition-colors duration-300">
-                    {product.name}
-                  </h3>
-                  
-                  <p className="text-[#1E1E1E]/70 text-sm font-medium">
-                    {product.benefit}
-                  </p>
-                  
-                  <div className="flex items-center justify-center gap-3">
-                    <span className="text-2xl font-bold text-[#D4AF37]">
-                      {product.price}
-                    </span>
-                    {product.originalPrice && (
-                      <span className="text-lg text-[#1E1E1E]/50 line-through">
-                        {product.originalPrice}
-                      </span>
-                    )}
+                  <div className="aspect-square mb-8 overflow-hidden rounded-xl relative">
+                    <img
+                      src={product.images[0] || '/placeholder-product.jpg'}
+                      alt={product.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#000000]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </div>
                   
-                  <Button 
-                    className="w-full group bg-[#000000] hover:bg-gradient-to-r hover:from-[#D4AF37] hover:to-[#6C7A61] hover:text-[#000000] text-white transition-all duration-500 transform hover:scale-105 rounded-xl font-bold"
-                  >
-                    Add to Cart
-                    <ShoppingCart className="ml-2 h-4 w-4 group-hover:scale-110 transition-transform" />
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                  <div className="text-center space-y-4">
+                    <Link href={`/product/${product.slug}`}>
+                      <h3 className="text-xl font-bold text-[#000000] group-hover:text-[#D4AF37] transition-colors duration-300 hover:underline cursor-pointer">
+                        {product.title}
+                      </h3>
+                    </Link>
+                    
+                    <p className="text-[#1E1E1E]/70 text-sm font-medium line-clamp-2">
+                      {product.short_description}
+                    </p>
+                    
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="text-2xl font-bold text-[#D4AF37]">
+                        £{product.price}
+                      </span>
+                    </div>
+                    
+                    <AddToCartButton
+                      product={{
+                        id: product.id,
+                        title: product.title,
+                        images: product.images,
+                        price: product.price,
+                        category: product.category,
+                        slug: product.slug,
+                        in_stock: product.in_stock,
+                        inventory: product.inventory,
+                      }}
+                      className="w-full group bg-[#000000] hover:bg-gradient-to-r hover:from-[#D4AF37] hover:to-[#6C7A61] hover:text-[#000000] text-white transition-all duration-500 transform hover:scale-105 rounded-xl font-bold"
+                      size="md"
+                    />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -504,6 +625,7 @@ export default function Home() {
             viewport={{ once: true }}
             className="text-center mt-16"
           >
+            <Link href="/shop">
             <Button 
               size="lg"
               className="group bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] hover:from-[#6C7A61] hover:to-[#D4AF37] text-[#000000] font-bold px-10 py-4 text-lg transition-all duration-500 transform hover:scale-105 shadow-xl hover:shadow-2xl rounded-full"
@@ -511,6 +633,7 @@ export default function Home() {
               Shop All Products
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
+            </Link>
           </motion.div>
         </div>
       </section>
@@ -666,107 +789,12 @@ export default function Home() {
       </section>
 
       {/* Bundles Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center px-6 py-3 rounded-full bg-gradient-to-r from-[#F4EBD0] to-[#D4AF37]/20 border border-[#D4AF37]/30 mb-6">
-              <Sparkles className="w-5 h-5 text-[#D4AF37] mr-2" />
-              <span className="text-[#1E1E1E] font-semibold text-sm">Special Offers</span>
-            </div>
-            <h2 className="text-4xl md:text-6xl font-bold text-[#000000] mb-6">
-              Bundle & Save
-            </h2>
-            <p className="text-xl text-[#1E1E1E]/70 font-light">
-              Try more. Glow more. Save more.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
-            {[
-              {
-                name: 'Confidence Kit',
-                products: 'Empire + Magnet Bar',
-                price: '£24',
-                originalPrice: '£27',
-                savings: 'Save £3',
-                image: 'https://images.pexels.com/photos/6621487/pexels-photo-6621487.jpeg?auto=compress&cs=tinysrgb&w=800',
-                gradient: 'from-amber-50 to-amber-100'
-              },
-              {
-                name: 'Complete Care Bundle',
-                products: 'Skin Rescue + Hair Oil + Tea',
-                price: '£42',
-                originalPrice: '£47',
-                savings: 'Save £5',
-                image: 'https://images.pexels.com/photos/7755552/pexels-photo-7755552.jpeg?auto=compress&cs=tinysrgb&w=800',
-                gradient: 'from-green-50 to-green-100'
-              }
-            ].map((bundle, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.2 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -15 }}
-                className={`group bg-gradient-to-br ${bundle.gradient} rounded-2xl shadow-lg p-10 transition-all duration-500 hover:shadow-2xl border border-white/50 relative overflow-hidden`}
-              >
-                {/* Savings Badge */}
-                <div className="absolute top-6 right-6 z-10">
-                  <span className="px-4 py-2 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] text-[#000000] text-sm font-bold">
-                    {bundle.savings}
-                  </span>
-                </div>
-
-                {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 to-[#6C7A61]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" />
-                
-                <div className="relative z-10">
-                  <div className="aspect-square mb-8 overflow-hidden rounded-xl">
-                    <img
-                      src={bundle.image}
-                      alt={bundle.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                  </div>
-                  
-                  <div className="text-center space-y-6">
-                    <h3 className="text-2xl font-bold text-[#000000] group-hover:text-[#D4AF37] transition-colors duration-300">
-                      {bundle.name}
-                    </h3>
-                    
-                    <p className="text-[#1E1E1E]/70 font-medium text-lg">
-                      {bundle.products}
-                    </p>
-                    
-                    <div className="flex items-center justify-center gap-4">
-                      <span className="text-3xl font-bold text-[#D4AF37]">
-                        {bundle.price}
-                      </span>
-                      <span className="text-xl text-[#1E1E1E]/50 line-through">
-                        {bundle.originalPrice}
-                      </span>
-                    </div>
-                    
-                    <Button 
-                      className="w-full group bg-[#000000] hover:bg-gradient-to-r hover:from-[#D4AF37] hover:to-[#6C7A61] hover:text-[#000000] text-white transition-all duration-500 transform hover:scale-105 rounded-xl font-bold py-4 text-lg"
-                    >
-                      Shop Bundle
-                      <ShoppingCart className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform" />
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <BundlesSection 
+        title="Bundle & Save"
+        subtitle="Try more. Glow more. Save more."
+        limit={0}
+        featured={false}
+      />
 
       {/* AI Product Matcher Teaser */}
       <section className="py-24 bg-gradient-to-br from-[#000000] via-[#1E1E1E] to-[#000000] relative overflow-hidden">
@@ -808,19 +836,19 @@ export default function Home() {
           >
             <div className="inline-flex items-center px-6 py-3 rounded-full bg-gradient-to-r from-[#D4AF37]/20 to-[#6C7A61]/20 border border-[#D4AF37]/30 mb-8">
               <Bot className="w-5 h-5 text-[#D4AF37] mr-2" />
-              <span className="text-white font-semibold text-sm">Coming Soon</span>
+              <span className="text-white font-semibold text-sm">Now Available</span>
             </div>
 
             <h2 className="text-4xl md:text-6xl font-bold text-white mb-8">
               Meet Your Perfect Match with
               <br />
               <span className="bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] bg-clip-text text-transparent">
-                AI Product Matcher
+                AI Skin Matcher
               </span>
             </h2>
             
             <p className="text-xl md:text-2xl mb-12 text-white/80 font-light max-w-4xl mx-auto leading-relaxed">
-              Answer 3 simple questions about your skin, hair, and wellness goals. Our AI instantly recommends the perfect Alkhemmy products tailored just for you.
+              Answer 6 simple questions about your skin, concerns, and lifestyle. Our AI instantly recommends the perfect Alkhemmy products tailored just for you.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-12">
@@ -869,14 +897,17 @@ export default function Home() {
               viewport={{ once: true }}
               className="flex flex-col sm:flex-row gap-6 justify-center"
             >
+              <Link href="/skin-matcher">
               <Button 
                 size="lg" 
                 className="group bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] hover:from-[#6C7A61] hover:to-[#D4AF37] text-[#000000] font-bold px-10 py-4 text-lg transition-all duration-500 transform hover:scale-105 shadow-xl hover:shadow-2xl rounded-full"
               >
                 <Bot className="mr-2 h-5 w-5" />
-                Get Early Access
+                  Try Skin Matcher
                 <Zap className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
               </Button>
+              </Link>
+              <Link href="/skin-matcher">
               <Button 
                 variant="outline" 
                 size="lg"
@@ -885,6 +916,7 @@ export default function Home() {
                 Learn More
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
+              </Link>
             </motion.div>
           </motion.div>
         </div>
@@ -909,46 +941,78 @@ export default function Home() {
             </h2>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -10, scale: 1.02 }}
-                className="group bg-white rounded-2xl p-8 text-center shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#D4AF37]/10 relative overflow-hidden"
-              >
-                {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-[#6C7A61]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" />
-                
-                <div className="relative z-10">
-                  <div className="flex justify-center mb-6">
-                    <img
-                      src={testimonial.avatar}
-                      alt={testimonial.name}
-                      className="w-16 h-16 rounded-full border-4 border-[#D4AF37] group-hover:scale-110 transition-transform duration-300"
-                    />
-                  </div>
-                  
-                  <div className="flex justify-center mb-6">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-[#D4AF37] fill-current" />
+          {reviewsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="bg-white rounded-2xl p-8 text-center shadow-lg animate-pulse">
+                  <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-6"></div>
+                  <div className="flex justify-center mb-6 space-x-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="w-5 h-5 bg-gray-200 rounded"></div>
                     ))}
                   </div>
-                  
-                  <blockquote className="text-[#1E1E1E]/80 font-medium text-lg mb-6 italic leading-relaxed">
-                    "{testimonial.quote}"
-                  </blockquote>
-                  
-                  <cite className="text-[#000000] font-bold text-lg group-hover:text-[#D4AF37] transition-colors duration-300">
-                    {testimonial.name}
-                  </cite>
+                  <div className="space-y-3 mb-6">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
+                  </div>
+                  <div className="h-6 bg-gray-200 rounded w-1/2 mx-auto"></div>
                 </div>
-              </motion.div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : recentReviews.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {recentReviews.map((review, index) => (
+                <motion.div
+                  key={review.id}
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                  viewport={{ once: true }}
+                  whileHover={{ y: -10, scale: 1.02 }}
+                  className="group bg-white rounded-2xl p-8 text-center shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#D4AF37]/10 relative overflow-hidden"
+                >
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-[#6C7A61]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl" />
+                  
+                  <div className="relative z-10">
+                    <div className="flex justify-center mb-6">
+                      <div className="w-16 h-16 rounded-full border-4 border-[#D4AF37] group-hover:scale-110 transition-transform duration-300 bg-gradient-to-br from-[#D4AF37] to-[#6C7A61] flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">
+                          {getInitials(review.user.name)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-center mb-6">
+                      {[...Array(review.rating)].map((_, i) => (
+                        <Star key={i} className="w-5 h-5 text-[#D4AF37] fill-current" />
+                      ))}
+                    </div>
+                    
+                    <blockquote className="text-[#1E1E1E]/80 font-medium text-lg mb-6 italic leading-relaxed">
+                      "{review.comment}"
+                    </blockquote>
+                    
+                    <div className="space-y-2">
+                      <cite className="text-[#000000] font-bold text-lg group-hover:text-[#D4AF37] transition-colors duration-300 block">
+                        {review.user.name}
+                      </cite>
+                      {review.product && (
+                        <p className="text-sm text-gray-500">
+                          Review for {review.product.title}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">No reviews yet. Be the first to review our products!</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1118,10 +1182,10 @@ export default function Home() {
                 Handcrafted Herbal Luxury
               </p>
               <div className="flex space-x-4 mt-6">
-                <a href="#" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 p-2 rounded-full hover:bg-[#D4AF37]/10">
+                <a href="https://instagram.com/alkhemmy" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 p-2 rounded-full hover:bg-[#D4AF37]/10">
                   <Instagram className="h-6 w-6" />
                 </a>
-                <a href="#" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 p-2 rounded-full hover:bg-[#D4AF37]/10">
+                <a href="https://facebook.com/alkhemmy" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 p-2 rounded-full hover:bg-[#D4AF37]/10">
                   <Facebook className="h-6 w-6" />
                 </a>
               </div>
@@ -1131,13 +1195,31 @@ export default function Home() {
             <div>
               <h4 className="text-lg font-bold mb-6 text-[#D4AF37]">Shop</h4>
               <ul className="space-y-3">
-                {['All Products', 'Collections', 'Bestsellers', 'New Arrivals', 'Bundles'].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
-                      {item}
-                    </a>
-                  </li>
-                ))}
+                <li>
+                  <Link href="/shop" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    All Products
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/shop" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    Collections
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/shop" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    Bestsellers
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/shop" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    New Arrivals
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/bundles" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    Bundles
+                  </Link>
+                </li>
               </ul>
             </div>
             
@@ -1145,13 +1227,31 @@ export default function Home() {
             <div>
               <h4 className="text-lg font-bold mb-6 text-[#D4AF37]">Support</h4>
               <ul className="space-y-3">
-                {['About Us', 'Contact', 'Shipping Policy', 'Returns', 'FAQ'].map((item) => (
-                  <li key={item}>
-                    <a href="#" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
-                      {item}
-                    </a>
-                  </li>
-                ))}
+                <li>
+                  <Link href="/about" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    Shipping Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    Returns
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-white/70 hover:text-[#D4AF37] transition-colors duration-300 font-medium">
+                    FAQ
+                  </Link>
+                </li>
               </ul>
             </div>
             
@@ -1196,23 +1296,30 @@ export default function Home() {
       >
         <div className="bg-white/95 backdrop-blur-xl rounded-full shadow-2xl border border-[#D4AF37]/20 px-6 py-3">
           <div className="flex items-center gap-6">
-            <button className="group p-3 rounded-full hover:bg-[#D4AF37]/10 transition-all duration-300">
-              <ShoppingCart className="h-5 w-5 text-[#1E1E1E] group-hover:text-[#D4AF37] transition-colors" />
-            </button>
-            <button className="group p-3 rounded-full hover:bg-[#D4AF37]/10 transition-all duration-300 relative">
-              <Bot className="h-5 w-5 text-[#1E1E1E] group-hover:text-[#D4AF37] transition-colors" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#D4AF37] rounded-full animate-pulse"></span>
-            </button>
-            <button className="group p-3 rounded-full hover:bg-[#D4AF37]/10 transition-all duration-300">
-              <Heart className="h-5 w-5 text-[#1E1E1E] group-hover:text-[#D4AF37] transition-colors" />
-            </button>
-            <Button 
-              size="sm"
-              onClick={() => window.location.href = '/shop'}
-              className="bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] hover:from-[#6C7A61] hover:to-[#D4AF37] text-[#000000] font-bold px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105"
-            >
-              Shop Now
-            </Button>
+            <Link href="/cart">
+              <button className="group p-3 rounded-full hover:bg-[#D4AF37]/10 transition-all duration-300">
+                <ShoppingCart className="h-5 w-5 text-[#1E1E1E] group-hover:text-[#D4AF37] transition-colors" />
+              </button>
+            </Link>
+            <Link href="/skin-matcher">
+              <button className="group p-3 rounded-full hover:bg-[#D4AF37]/10 transition-all duration-300 relative">
+                <Bot className="h-5 w-5 text-[#1E1E1E] group-hover:text-[#D4AF37] transition-colors" />
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#D4AF37] rounded-full animate-pulse"></span>
+              </button>
+            </Link>
+            <Link href="/wishlist">
+              <button className="group p-3 rounded-full hover:bg-[#D4AF37]/10 transition-all duration-300">
+                <Heart className="h-5 w-5 text-[#1E1E1E] group-hover:text-[#D4AF37] transition-colors" />
+              </button>
+            </Link>
+            <Link href="/shop">
+              <Button 
+                size="sm"
+                className="bg-gradient-to-r from-[#D4AF37] to-[#6C7A61] hover:from-[#6C7A61] hover:to-[#D4AF37] text-[#000000] font-bold px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105"
+              >
+                Shop Now
+              </Button>
+            </Link>
           </div>
         </div>
       </motion.div>

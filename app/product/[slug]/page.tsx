@@ -1,12 +1,11 @@
 import ProductClientPage from './ProductClientPage';
-import { getProductData, getRelatedProducts, generateStaticParams as getStaticParams } from './product-data';
+import { getProductBySlug, getRelatedProducts } from '@/lib/products';
 
-// Re-export generateStaticParams from the utility file
-export const generateStaticParams = getStaticParams;
+// Dynamic route - no static generation needed
 
-export default function ProductPage({ params }: { params: { slug: string } }) {
-  const product = getProductData(params.slug);
-  const relatedProducts = getRelatedProducts(params.slug);
+export default async function ProductPage({ params }: { params: { slug: string } }) {
+  const product = await getProductBySlug(params.slug);
+  const relatedProducts = await getRelatedProducts(params.slug);
 
   if (!product) {
     return (

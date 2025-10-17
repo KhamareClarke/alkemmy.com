@@ -1,9 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Filter, Grid, List, Star, ShoppingCart, Heart, Search, Check } from 'lucide-react';
+import { Filter, Grid, List, Star, ShoppingCart, Heart, Search, Check, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getAllProducts, getCategories, getTags } from '@/lib/products';
+import { Product, ProductFilters } from '@/lib/supabase';
+import ProductCard from '@/components/ProductCard';
+import { useProductRatings } from '@/hooks/useProductRatings';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 // Animation variants
 const containerVariants = {
@@ -27,63 +33,9 @@ const itemVariants = {
   }
 };
 
-// Product Card Component
-const ProductCard = ({ product, index }: { product: any; index: number }) => {
-  const [isWishlisted, setIsWishlisted] = useState(false);
-
-  return (
-    <motion.div
-      variants={itemVariants}
-      className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100"
-    >
-      <div className="relative overflow-hidden">
-        <div className="aspect-square bg-gradient-to-br from-[#F4EBD0] to-[#E8D5B7] flex items-center justify-center">
-          <div className="w-24 h-24 bg-[#D4AF37] rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-lg">{product.name.charAt(0)}</span>
-          </div>
-        </div>
-        <button
-          onClick={() => setIsWishlisted(!isWishlisted)}
-          className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-200"
-        >
-          <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
-        </button>
-        {product.badge && (
-          <div className="absolute top-3 left-3 bg-[#D4AF37] text-black px-2 py-1 rounded-full text-xs font-semibold">
-            {product.badge}
-          </div>
-        )}
-      </div>
-      
-      <div className="p-6">
-        <h3 className="font-bold text-lg text-gray-900 mb-2 group-hover:text-[#D4AF37] transition-colors">
-          {product.name}
-        </h3>
-        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-          {product.benefit}
-        </p>
-        
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-2xl font-bold text-[#D4AF37]">£{product.price}</span>
-          <div className="flex items-center space-x-1">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="w-4 h-4 fill-[#D4AF37] text-[#D4AF37]" />
-            ))}
-            <span className="text-sm text-gray-500 ml-1">(4.8)</span>
-          </div>
-        </div>
-        
-        <Button className="w-full bg-[#D4AF37] hover:bg-[#B8941F] text-black font-semibold py-3 rounded-full transition-all duration-200 hover:scale-105">
-          <ShoppingCart className="w-4 h-4 mr-2" />
-          Add to Cart
-        </Button>
-      </div>
-    </motion.div>
-  );
-};
 
 // Category Section Component
-const CategorySection = ({ title, subtitle, products }: { title: string; subtitle: string; products: any[] }) => {
+const CategorySection = ({ title, subtitle, products, ratings, viewMode }: { title: string; subtitle: string; products: any[]; ratings: any; viewMode: 'grid' | 'list' }) => {
   return (
     <motion.section 
       className="mb-20"
@@ -101,11 +53,21 @@ const CategorySection = ({ title, subtitle, products }: { title: string; subtitl
       </motion.div>
       
       <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+        className={viewMode === 'grid' 
+          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
+          : "space-y-4"
+        }
         variants={containerVariants}
       >
         {products.map((product, index) => (
-          <ProductCard key={product.name} product={product} index={index} />
+          <ProductCard 
+            key={product.id} 
+            product={product} 
+            index={index}
+            averageRating={ratings[product.id]?.averageRating || 0}
+            totalReviews={ratings[product.id]?.totalReviews || 0}
+            viewMode={viewMode}
+          />
         ))}
       </motion.div>
     </motion.section>
@@ -113,28 +75,107 @@ const CategorySection = ({ title, subtitle, products }: { title: string; subtitl
 };
 
 export default function ShopPage() {
-  const [viewMode, setViewMode] = useState('grid');
+  const searchParams = useSearchParams();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const categories = [
-    { id: 'soaps', label: 'Soaps' },
-    { id: 'teas', label: 'Teas' },
-    { id: 'oils', label: 'Oils' },
-    { id: 'lotions', label: 'Lotions' },
-    { id: 'shampoo', label: 'Shampoo' },
-    { id: 'beard', label: 'Beard' },
-    { id: 'rollons', label: 'Roll-Ons' },
-    { id: 'all', label: 'All' }
-  ];
+  // Get product IDs for fetching ratings
+  const productIds = products.map(product => product.id);
+  const { ratings, loading: ratingsLoading } = useProductRatings(productIds);
 
-  const filterTags = [
-    { id: 'vegan', label: 'Vegan', icon: '✅' },
-    { id: 'bestseller', label: 'Bestseller', icon: '🔥' },
-    { id: 'sensitive', label: 'Sensitive Skin', icon: '🌿' },
-    { id: 'dry', label: 'Dry Skin', icon: '💧' },
-    { id: 'daily', label: 'Daily Use', icon: '🧴' }
-  ];
+  // Dynamic filter tags based on available tags in database
+  const filterTags = availableTags.slice(0, 8).map(tag => {
+    const iconMap: Record<string, string> = {
+      'Vegan': '✅',
+      'Bestseller': '🔥',
+      'Handmade': '🌿',
+      'Daily Use': '💧',
+      'Premium': '🧴',
+      'Natural': '🌱',
+      'Organic': '🌿',
+      'Sulfate Free': '🚫',
+      'Fragrance Free': '🌸',
+      'Hypoallergenic': '🛡️',
+      'Cruelty Free': '🐰',
+      'Eco Friendly': '🌍'
+    };
+    
+    return {
+      id: tag,
+      label: tag,
+      icon: iconMap[tag] || '🏷️'
+    };
+  });
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Load initial data and check URL parameters
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [productsData, categoriesData, tagsData] = await Promise.all([
+          getAllProducts(),
+          getCategories(),
+          getTags()
+        ]);
+        
+        setProducts(productsData);
+        setCategories(['all', ...categoriesData]);
+        setAvailableTags(tagsData);
+        
+        // Check for category parameter in URL
+        const categoryParam = searchParams.get('category');
+        if (categoryParam) {
+          setSelectedCategory(categoryParam);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [searchParams]);
+
+  // Filter products based on current filters
+  useEffect(() => {
+    const filterProducts = async () => {
+      try {
+        setLoading(true);
+        const filters: ProductFilters = {
+          category: selectedCategory !== 'all' ? selectedCategory : undefined,
+          tags: selectedFilters.length > 0 ? selectedFilters : undefined,
+          search: debouncedSearchTerm || undefined,
+          in_stock: true
+        };
+
+        const filteredProducts = await getAllProducts(filters);
+        setProducts(filteredProducts);
+      } catch (error) {
+        console.error('Error filtering products:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    filterProducts();
+  }, [selectedCategory, selectedFilters, debouncedSearchTerm]);
 
   const toggleFilter = (filterId: string) => {
     setSelectedFilters(prev => 
@@ -144,67 +185,33 @@ export default function ShopPage() {
     );
   };
 
-  // Product Data
-  const soapBars = [
-    { name: "Empire Bar", price: 12, benefit: "Masculine daily cleanser", badge: "Bestseller" },
-    { name: "Magnet Bar", price: 12, benefit: "Seductive attraction bar", badge: "Popular" },
-    { name: "Acne Bar", price: 12, benefit: "Breakout control" },
-    { name: "Hyperpigmentation Bar", price: 12, benefit: "Evens tone" },
-    { name: "Eczema Bar", price: 12, benefit: "Soothing and gentle" },
-    { name: "Skin Rescue Bar", price: 14, benefit: "For damaged skin", badge: "New" },
-    { name: "Charcoal Detox Bar", price: 12, benefit: "Deep pore cleanse" },
-    { name: "Gold Leaf Bar", price: 16, benefit: "Luxury glow", badge: "Premium" },
-    { name: "Clarity Bar", price: 12, benefit: "Focus and refresh" },
-    { name: "Money Bar", price: 14, benefit: "Energetic cleanser" },
-    { name: "Root Healing Bar", price: 14, benefit: "Grounding bar" },
-    { name: "Cacao Bar", price: 14, benefit: "Antioxidant-rich" },
-    { name: "Dandelion Detox Bar", price: 13, benefit: "Skin detox" },
-    { name: "Versace Red Clone Bar", price: 16, benefit: "Signature fragrance", badge: "Limited" }
-  ];
-
-  const herbalTeas = [
-    { name: "Fat Loss Tea", price: 10, benefit: "Supports metabolism", badge: "Bestseller" },
-    { name: "Immunity Tea", price: 10, benefit: "Strengthens defense" },
-    { name: "Energy Tea", price: 10, benefit: "Natural energy boost" },
-    { name: "Cognitive Clarity Tea", price: 12, benefit: "Mental sharpness", badge: "New" },
-    { name: "Skin Glow Tea", price: 11, benefit: "Clears skin from within" }
-  ];
-
-  const hairBodyOils = [
-    { name: "Herbal Hair Oil", price: 15, benefit: "Growth + scalp health", badge: "Popular" },
-    { name: "Body Glow Oil", price: 14, benefit: "Moisturising full-body oil" },
-    { name: "CBD Repair Oil", price: 18, benefit: "Pain relief + moisture", badge: "Premium" },
-    { name: "Beard Growth Oil", price: 16, benefit: "For strong, thick beards" },
-    { name: "Anti-Itch Scalp Oil", price: 14, benefit: "Soothes flakes and irritation" }
-  ];
-
-  const beardCare = [
-    { name: "Beard Elixir", price: 16, benefit: "Premium conditioning", badge: "Bestseller" },
-    { name: "Attraction Roll-On", price: 12, benefit: "Long-lasting herbal fragrance" },
-    { name: "Freshness Roll-On", price: 10, benefit: "Herbal deodorant" }
-  ];
-
-  const herbalLotions = [
-    { name: "Skin Therapy Lotion", price: 14, benefit: "Deep hydration" },
-    { name: "Brightening Lotion", price: 15, benefit: "Evens skin tone", badge: "New" },
-    { name: "Eczema Relief Lotion", price: 14, benefit: "For sensitive skin" },
-    { name: "CBD Recovery Lotion", price: 18, benefit: "Relax muscles and nourish skin", badge: "Premium" }
-  ];
-
-  const shampoosConditioners = [
-    { name: "Herbal Shampoo", price: 12, benefit: "Cleans without stripping" },
-    { name: "Growth Conditioner", price: 13, benefit: "Strengthens roots", badge: "Popular" },
-    { name: "Hydrating Conditioner", price: 13, benefit: "Deep moisture" }
-  ];
-
-  const elixirsRollOns = [
-    { name: "Calm Focus Elixir", price: 10, benefit: "Mind clarity" },
-    { name: "Sleep Roll-On", price: 10, benefit: "Nighttime relaxation", badge: "Bestseller" },
-    { name: "Rise & Shine Roll-On", price: 10, benefit: "Morning boost" }
-  ];
+  // Group products by category
+  const productsByCategory = products.reduce((acc, product) => {
+    if (!acc[product.category]) {
+      acc[product.category] = [];
+    }
+    acc[product.category].push(product);
+    return acc;
+  }, {} as Record<string, Product[]>);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+      {/* Header with Home Button */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Home
+              </Button>
+            </Link>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <h1 className="text-2xl font-bold text-gray-900">Shop</h1>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-[#D4AF37] to-[#B8941F] text-black py-20">
         <div className="max-w-7xl mx-auto px-4 text-center">
@@ -224,14 +231,74 @@ export default function ShopPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search products..."
-                  className="pl-10 pr-4 py-3 rounded-full border-0 focus:ring-2 focus:ring-white/50 w-80"
+                  placeholder="Search products by name, description, or ingredients..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-3 rounded-full border-0 focus:ring-2 focus:ring-white/50 w-80 text-black placeholder-gray-500"
                 />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
         </div>
       </section>
+
+      {/* Search Results Indicator */}
+      {searchTerm && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Search className="w-4 h-4 text-blue-600" />
+                <span className="text-blue-800 font-medium">
+                  Search results for "{searchTerm}"
+                </span>
+                <span className="text-blue-600 text-sm">
+                  ({products.length} {products.length === 1 ? 'product' : 'products'} found)
+                </span>
+              </div>
+              <button
+                onClick={() => setSearchTerm('')}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Clear search
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Filters Indicator */}
+      {selectedFilters.length > 0 && (
+        <div className="bg-green-50 border-b border-green-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Filter className="w-4 h-4 text-green-600" />
+                <span className="text-green-800 font-medium">
+                  Active filters: {selectedFilters.join(', ')}
+                </span>
+                <span className="text-green-600 text-sm">
+                  ({products.length} {products.length === 1 ? 'product' : 'products'} found)
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedFilters([])}
+                className="text-green-600 hover:text-green-800 text-sm font-medium"
+              >
+                Clear filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sticky Category Navigation */}
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200">
@@ -239,15 +306,15 @@ export default function ShopPage() {
           <div className="flex items-center justify-center space-x-2 overflow-x-auto">
             {categories.map((category) => (
               <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
+                key={category}
+                onClick={() => setSelectedCategory(category)}
                 className={`px-6 py-2 rounded-full font-semibold whitespace-nowrap transition-all duration-200 ${
-                  selectedCategory === category.id
+                  selectedCategory === category
                     ? 'bg-[#D4AF37] text-black shadow-lg'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {category.label}
+                {category === 'all' ? 'All' : category}
               </button>
             ))}
           </div>
@@ -259,66 +326,80 @@ export default function ShopPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-center gap-3">
             <span className="text-sm font-medium text-gray-600 mr-2">Quick Filters:</span>
-            {filterTags.map((filter) => (
+            {filterTags.length > 0 ? (
+              filterTags.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => toggleFilter(filter.id)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    selectedFilters.includes(filter.id)
+                      ? 'bg-[#D4AF37] text-black shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  <span>{filter.icon}</span>
+                  <span>{filter.label}</span>
+                  {selectedFilters.includes(filter.id) && (
+                    <Check className="w-4 h-4" />
+                  )}
+                </button>
+              ))
+            ) : (
+              <span className="text-sm text-gray-500">No filters available</span>
+            )}
+            {selectedFilters.length > 0 && (
               <button
-                key={filter.id}
-                onClick={() => toggleFilter(filter.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                  selectedFilters.includes(filter.id)
-                    ? 'bg-[#D4AF37] text-black shadow-md'
-                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                }`}
+                onClick={() => setSelectedFilters([])}
+                className="flex items-center space-x-1 px-3 py-2 rounded-full text-sm font-medium text-red-600 hover:bg-red-50 border border-red-200"
               >
-                <span>{filter.icon}</span>
-                <span>{filter.label}</span>
-                {selectedFilters.includes(filter.id) && (
-                  <Check className="w-4 h-4" />
-                )}
+                <span>✕</span>
+                <span>Clear All</span>
               </button>
-            ))}
+            )}
           </div>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* View Mode Toggle */}
       <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center space-x-4">
-              <select className="px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
-                <option>All Skin Types</option>
-                <option>Sensitive</option>
-                <option>Oily</option>
-                <option>Dry</option>
-                <option>Combination</option>
-              </select>
-              <select className="px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
-                <option>All Products</option>
-                <option>Soaps</option>
-                <option>Teas</option>
-                <option>Oils</option>
-                <option>Lotions</option>
-              </select>
-              <select className="px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent">
-                <option>All Prices</option>
-                <option>Under £15</option>
-                <option>£15 - £20</option>
-                <option>Over £20</option>
-              </select>
+            {/* Results count */}
+            <div className="text-sm text-gray-600">
+              {!loading && (
+                <span>
+                  {products.length} {products.length === 1 ? 'product' : 'products'} found
+                </span>
+              )}
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-[#D4AF37] text-black' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                <Grid className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-[#D4AF37] text-black' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                <List className="w-5 h-5" />
-              </button>
+            
+            {/* View toggle */}
+            <div className="flex items-center space-x-1">
+              <span className="text-sm text-gray-600 mr-2 hidden sm:inline">View:</span>
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md transition-all duration-200 ${
+                    viewMode === 'grid' 
+                      ? 'bg-[#D4AF37] text-black shadow-sm' 
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title="Grid view"
+                >
+                  <Grid className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition-all duration-200 ${
+                    viewMode === 'list' 
+                      ? 'bg-[#D4AF37] text-black shadow-sm' 
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title="List view"
+                >
+                  <List className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -326,60 +407,53 @@ export default function ShopPage() {
 
       {/* Product Categories */}
       <div className="max-w-7xl mx-auto px-4 py-20">
-        {(selectedCategory === 'all' || selectedCategory === 'soaps') && (
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading products...</p>
+            </div>
+          </div>
+        ) : selectedCategory === 'all' ? (
+          // Show all categories
+          Object.entries(productsByCategory).map(([category, categoryProducts]) => (
           <CategorySection
-            title="Soap Bars"
-            subtitle="Powerful formulas for every skin goal."
-            products={soapBars}
-          />
+              key={category}
+              title={category}
+              subtitle={`Discover our ${category.toLowerCase()} collection.`}
+              products={categoryProducts as Product[]}
+              ratings={ratings}
+              viewMode={viewMode}
+            />
+          ))
+        ) : (
+          // Show specific category
+          productsByCategory[selectedCategory] && (
+          <CategorySection
+              title={selectedCategory}
+              subtitle={`Discover our ${selectedCategory.toLowerCase()} collection.`}
+              products={productsByCategory[selectedCategory]}
+              ratings={ratings}
+              viewMode={viewMode}
+            />
+          )
         )}
-
-        {(selectedCategory === 'all' || selectedCategory === 'teas') && (
-          <CategorySection
-            title="Herbal Teas"
-            subtitle="Drink your way to balance."
-            products={herbalTeas}
-          />
-        )}
-
-        {(selectedCategory === 'all' || selectedCategory === 'oils') && (
-          <CategorySection
-            title="Hair & Body Oils"
-            subtitle="Nourish from root to tip."
-            products={hairBodyOils}
-          />
-        )}
-
-        {(selectedCategory === 'all' || selectedCategory === 'beard') && (
-          <CategorySection
-            title="Beard Oils & Roll-Ons"
-            subtitle="Groom like royalty."
-            products={beardCare}
-          />
-        )}
-
-        {(selectedCategory === 'all' || selectedCategory === 'lotions') && (
-          <CategorySection
-            title="Natural Lotions"
-            subtitle="Hydrate, heal, and protect."
-            products={herbalLotions}
-          />
-        )}
-
-        {(selectedCategory === 'all' || selectedCategory === 'shampoo') && (
-          <CategorySection
-            title="Shampoos & Conditioners"
-            subtitle="Gentle on scalp, rich in nutrients."
-            products={shampoosConditioners}
-          />
-        )}
-
-        {(selectedCategory === 'all' || selectedCategory === 'rollons') && (
-          <CategorySection
-            title="Elixirs & Aromatherapy"
-            subtitle="On-the-go healing + scent rituals."
-            products={elixirsRollOns}
-          />
+        
+        {!loading && products.length === 0 && (
+          <div className="text-center py-20">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">No products found</h3>
+            <p className="text-gray-600 mb-8">Try adjusting your search or filters</p>
+            <Button 
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedFilters([]);
+                setSelectedCategory('all');
+              }}
+              className="bg-[#D4AF37] hover:bg-[#B8941F] text-black font-semibold px-6 py-3 rounded-full"
+            >
+              Clear Filters
+            </Button>
+          </div>
         )}
       </div>
 
