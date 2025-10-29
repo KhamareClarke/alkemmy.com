@@ -5,14 +5,22 @@ import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Eye, Search, Filter, Save, X, Users, ShoppingBag, Package, Clock, CheckCircle, Truck, AlertCircle, RefreshCw, Mail, Send, FileText, Star, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
-  getSoaps, 
-  getHerbalTeas, 
-  getLotions, 
-  getOils, 
-  getBeardCareProducts, 
-  getShampoos, 
-  getRollOns, 
-  getElixirs
+  getSoapsForAdmin, 
+  getHerbalTeasForAdmin, 
+  getLotionsForAdmin, 
+  getOilsForAdmin, 
+  getBeardCareForAdmin, 
+  getShampoosForAdmin, 
+  getRollOnsForAdmin, 
+  getElixirsForAdmin,
+  getSoapBySlug,
+  getHerbalTeaBySlug,
+  getLotionBySlug,
+  getOilBySlug,
+  getBeardCareBySlug,
+  getShampooBySlug,
+  getRollOnBySlug,
+  getElixirBySlug
 } from '@/lib/category-api';
 import {
   Soap,
@@ -528,28 +536,28 @@ export default function AdminPage() {
           
           switch (selectedCategory) {
             case 'soaps':
-              productsData = await getSoaps();
+              productsData = await getSoapsForAdmin() as CategoryProduct[];
               break;
             case 'teas':
-              productsData = await getHerbalTeas();
+              productsData = await getHerbalTeasForAdmin() as CategoryProduct[];
               break;
             case 'lotions':
-              productsData = await getLotions();
+              productsData = await getLotionsForAdmin() as CategoryProduct[];
               break;
             case 'oils':
-              productsData = await getOils();
+              productsData = await getOilsForAdmin() as CategoryProduct[];
               break;
             case 'beard-care':
-              productsData = await getBeardCareProducts();
+              productsData = await getBeardCareForAdmin() as CategoryProduct[];
               break;
             case 'shampoos':
-              productsData = await getShampoos();
+              productsData = await getShampoosForAdmin() as CategoryProduct[];
               break;
             case 'roll-ons':
-              productsData = await getRollOns();
+              productsData = await getRollOnsForAdmin() as CategoryProduct[];
               break;
             case 'elixirs':
-              productsData = await getElixirs();
+              productsData = await getElixirsForAdmin() as CategoryProduct[];
               break;
           }
           
@@ -737,7 +745,7 @@ export default function AdminPage() {
     loadOrders();
   }, []);
 
-  // Load products for selected category
+  // Load products for selected category (optimized for admin - excludes large fields)
   useEffect(() => {
     const loadProducts = async () => {
       setLoading(true);
@@ -745,28 +753,28 @@ export default function AdminPage() {
         let data: CategoryProduct[] = [];
         switch (selectedCategory) {
           case 'soaps':
-            data = await getSoaps();
+            data = await getSoapsForAdmin() as CategoryProduct[];
             break;
           case 'teas':
-            data = await getHerbalTeas();
+            data = await getHerbalTeasForAdmin() as CategoryProduct[];
             break;
           case 'lotions':
-            data = await getLotions();
+            data = await getLotionsForAdmin() as CategoryProduct[];
             break;
           case 'oils':
-            data = await getOils();
+            data = await getOilsForAdmin() as CategoryProduct[];
             break;
           case 'beard-care':
-            data = await getBeardCareProducts();
+            data = await getBeardCareForAdmin() as CategoryProduct[];
             break;
           case 'shampoos':
-            data = await getShampoos();
+            data = await getShampoosForAdmin() as CategoryProduct[];
             break;
           case 'roll-ons':
-            data = await getRollOns();
+            data = await getRollOnsForAdmin() as CategoryProduct[];
             break;
           case 'elixirs':
-            data = await getElixirs();
+            data = await getElixirsForAdmin() as CategoryProduct[];
             break;
         }
         setProducts(data);
@@ -801,9 +809,55 @@ export default function AdminPage() {
     setShowAddForm(true);
   };
 
-  const handleEditProduct = (product: CategoryProduct) => {
-    setEditingProduct(product);
-    setShowAddForm(true);
+  const handleEditProduct = async (product: CategoryProduct) => {
+    setLoading(true);
+    try {
+      // Fetch full product data (with images) for editing
+      let fullProduct: CategoryProduct | null = null;
+      
+      switch (selectedCategory) {
+        case 'soaps':
+          fullProduct = await getSoapBySlug(product.slug);
+          break;
+        case 'teas':
+          fullProduct = await getHerbalTeaBySlug(product.slug);
+          break;
+        case 'lotions':
+          fullProduct = await getLotionBySlug(product.slug);
+          break;
+        case 'oils':
+          fullProduct = await getOilBySlug(product.slug);
+          break;
+        case 'beard-care':
+          fullProduct = await getBeardCareBySlug(product.slug);
+          break;
+        case 'shampoos':
+          fullProduct = await getShampooBySlug(product.slug);
+          break;
+        case 'roll-ons':
+          fullProduct = await getRollOnBySlug(product.slug);
+          break;
+        case 'elixirs':
+          fullProduct = await getElixirBySlug(product.slug);
+          break;
+      }
+      
+      if (fullProduct) {
+        setEditingProduct(fullProduct);
+        setShowAddForm(true);
+      } else {
+        // Fallback to partial product if full fetch fails
+        setEditingProduct(product);
+        setShowAddForm(true);
+      }
+    } catch (error) {
+      console.error('Error fetching full product data:', error);
+      // Fallback to partial product
+      setEditingProduct(product);
+      setShowAddForm(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteProduct = async (product: CategoryProduct) => {
@@ -1947,28 +2001,28 @@ export default function AdminPage() {
                 let data: CategoryProduct[] = [];
                 switch (selectedCategory) {
                   case 'soaps':
-                    data = await getSoaps();
+                    data = await getSoapsForAdmin() as CategoryProduct[];
                     break;
                   case 'teas':
-                    data = await getHerbalTeas();
+                    data = await getHerbalTeasForAdmin() as CategoryProduct[];
                     break;
                   case 'lotions':
-                    data = await getLotions();
+                    data = await getLotionsForAdmin() as CategoryProduct[];
                     break;
                   case 'oils':
-                    data = await getOils();
+                    data = await getOilsForAdmin() as CategoryProduct[];
                     break;
                   case 'beard-care':
-                    data = await getBeardCareProducts();
+                    data = await getBeardCareForAdmin() as CategoryProduct[];
                     break;
                   case 'shampoos':
-                    data = await getShampoos();
+                    data = await getShampoosForAdmin() as CategoryProduct[];
                     break;
                   case 'roll-ons':
-                    data = await getRollOns();
+                    data = await getRollOnsForAdmin() as CategoryProduct[];
                     break;
                   case 'elixirs':
-                    data = await getElixirs();
+                    data = await getElixirsForAdmin() as CategoryProduct[];
                     break;
                 }
                 setProducts(data);

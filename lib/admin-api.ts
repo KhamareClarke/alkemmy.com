@@ -254,7 +254,72 @@ export async function getBundleBySlug(slug: string): Promise<Bundle | null> {
     return null;
   }
   
-  return data as Bundle;
+  if (!data) {
+    return null;
+  }
+
+  // Fetch product names for bundle items
+  const bundleItemsWithNames = await Promise.all(
+    (data.bundle_items || []).map(async (item: { product_id: string; quantity: number; product_type: string }) => {
+      try {
+        // Get the table name from product_type (category name)
+        // product_type could be a category name (e.g., "teas") or already a table name (e.g., "herbal_teas")
+        let tableName: string = CATEGORY_TABLES[item.product_type as CategoryName] || '';
+        
+        // If not found in CATEGORY_TABLES, try using product_type as-is (might be a table name)
+        if (!tableName) {
+          // Check if it's a valid table name by checking all table values
+          const allTableNames = Object.values(CATEGORY_TABLES);
+          if (allTableNames.includes(item.product_type as any)) {
+            tableName = item.product_type;
+          } else {
+            // Fallback: try common mappings
+            const tableMappings: Record<string, string> = {
+              'herbal_teas': 'herbal_teas',
+              'beard_care': 'beard_care',
+              'roll_ons': 'roll_ons',
+              'soaps': 'soaps',
+              'lotions': 'lotions',
+              'oils': 'oils',
+              'shampoos': 'shampoos',
+              'elixirs': 'elixirs'
+            };
+            tableName = tableMappings[item.product_type] || item.product_type;
+          }
+        }
+        
+        const { data: productData, error: productError } = await supabase
+          .from(tableName)
+          .select('id, title')
+          .eq('id', item.product_id)
+          .single();
+
+        if (productError || !productData) {
+          console.error(`Error fetching product ${item.product_id} from ${tableName}:`, productError);
+          return {
+            ...item,
+            product_name: 'Product Not Found'
+          };
+        }
+
+        return {
+          ...item,
+          product_name: productData.title
+        };
+      } catch (err) {
+        console.error(`Error processing bundle item ${item.product_id}:`, err);
+        return {
+          ...item,
+          product_name: 'Product Not Found'
+        };
+      }
+    })
+  );
+
+  return {
+    ...data,
+    bundle_items: bundleItemsWithNames
+  } as Bundle;
 }
 
 export async function getRelatedBundles(currentSlug: string): Promise<Bundle[]> {

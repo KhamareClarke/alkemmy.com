@@ -134,9 +134,72 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Create skin_matcher_sessions table
+CREATE TABLE IF NOT EXISTS skin_matcher_sessions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  age TEXT,
+  gender TEXT,
+  skin_type TEXT,
+  concerns TEXT[] DEFAULT '{}',
+  budget TEXT,
+  lifestyle TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create skin_matcher_recommendations table
+CREATE TABLE IF NOT EXISTS skin_matcher_recommendations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  session_id UUID REFERENCES skin_matcher_sessions(id) ON DELETE CASCADE NOT NULL,
+  product_id TEXT NOT NULL,
+  product_title TEXT NOT NULL,
+  product_category TEXT NOT NULL,
+  product_slug TEXT NOT NULL,
+  product_image TEXT,
+  product_price DECIMAL(10,2) NOT NULL,
+  score INTEGER DEFAULT 0,
+  reasons TEXT[] DEFAULT '{}',
+  rank_order INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Row Level Security (RLS) for skin matcher tables
+ALTER TABLE skin_matcher_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skin_matcher_recommendations ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies for skin_matcher_sessions
+-- Allow users to view their own sessions, or allow anonymous inserts
+CREATE POLICY "Users can view own skin matcher sessions" ON skin_matcher_sessions
+  FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Users can insert own skin matcher sessions" ON skin_matcher_sessions
+  FOR INSERT WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+-- Create RLS policies for skin_matcher_recommendations
+CREATE POLICY "Users can view own skin matcher recommendations" ON skin_matcher_recommendations
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM skin_matcher_sessions 
+      WHERE skin_matcher_sessions.id = skin_matcher_recommendations.session_id 
+      AND (skin_matcher_sessions.user_id = auth.uid() OR skin_matcher_sessions.user_id IS NULL)
+    )
+  );
+
+CREATE POLICY "Users can insert own skin matcher recommendations" ON skin_matcher_recommendations
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM skin_matcher_sessions 
+      WHERE skin_matcher_sessions.id = skin_matcher_recommendations.session_id 
+      AND (skin_matcher_sessions.user_id = auth.uid() OR skin_matcher_sessions.user_id IS NULL)
+    )
+  );
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_addresses_user_id ON addresses(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
-
+CREATE INDEX IF NOT EXISTS idx_skin_matcher_sessions_user_id ON skin_matcher_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_skin_matcher_sessions_created_at ON skin_matcher_sessions(created_at);
+CREATE INDEX IF NOT EXISTS idx_skin_matcher_recommendations_session_id ON skin_matcher_recommendations(session_id);
+CREATE INDEX IF NOT EXISTS idx_skin_matcher_recommendations_product_id ON skin_matcher_recommendations(product_id);

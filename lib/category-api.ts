@@ -214,6 +214,88 @@ export async function getRelatedElixirs(currentSlug: string): Promise<Elixir[]> 
   return getRelatedCategoryProducts<Elixir>('elixirs', currentSlug);
 }
 
+// Optimized function for admin list view (excludes large fields like images)
+export async function getCategoryProductsForAdmin<T extends CategoryProduct>(
+  category: CategoryName,
+  filters?: CategoryFilters
+): Promise<Partial<T>[]> {
+  const tableName = CATEGORY_TABLES[category];
+  
+  // Select only essential fields for admin list view (exclude images, descriptions to improve performance)
+  // Core fields that exist in all category tables
+  let query = supabase
+    .from(tableName)
+    .select('id, title, slug, price, inventory, in_stock, created_at, updated_at, tags');
+
+  if (filters?.search) {
+    query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,short_description.ilike.%${filters.search}%`);
+  }
+  if (filters?.min_price !== undefined) {
+    query = query.gte('price', filters.min_price);
+  }
+  if (filters?.max_price !== undefined) {
+    query = query.lte('price', filters.max_price);
+  }
+  if (filters?.in_stock !== undefined) {
+    query = query.eq('in_stock', filters.in_stock);
+  }
+  if (filters?.tags && filters.tags.length > 0) {
+    query = query.contains('tags', filters.tags);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) {
+    console.error(`Error fetching ${category} products for admin:`, error);
+    console.error('Error details:', error);
+    // Fallback to regular query if optimized one fails
+    try {
+      const fallbackQuery = supabase.from(tableName).select('id, title, slug, price, inventory, in_stock');
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery.order('created_at', { ascending: false });
+      if (!fallbackError && fallbackData) {
+        return fallbackData as Partial<T>[];
+      }
+    } catch (fallbackErr) {
+      console.error('Fallback query also failed:', fallbackErr);
+    }
+    return [];
+  }
+  return data as Partial<T>[];
+}
+
+// Specific admin functions for each category
+export async function getSoapsForAdmin(filters?: CategoryFilters): Promise<Partial<Soap>[]> {
+  return getCategoryProductsForAdmin<Soap>('soaps', filters);
+}
+
+export async function getHerbalTeasForAdmin(filters?: CategoryFilters): Promise<Partial<HerbalTea>[]> {
+  return getCategoryProductsForAdmin<HerbalTea>('teas', filters);
+}
+
+export async function getLotionsForAdmin(filters?: CategoryFilters): Promise<Partial<Lotion>[]> {
+  return getCategoryProductsForAdmin<Lotion>('lotions', filters);
+}
+
+export async function getOilsForAdmin(filters?: CategoryFilters): Promise<Partial<Oil>[]> {
+  return getCategoryProductsForAdmin<Oil>('oils', filters);
+}
+
+export async function getBeardCareForAdmin(filters?: CategoryFilters): Promise<Partial<BeardCare>[]> {
+  return getCategoryProductsForAdmin<BeardCare>('beard-care', filters);
+}
+
+export async function getShampoosForAdmin(filters?: CategoryFilters): Promise<Partial<Shampoo>[]> {
+  return getCategoryProductsForAdmin<Shampoo>('shampoos', filters);
+}
+
+export async function getRollOnsForAdmin(filters?: CategoryFilters): Promise<Partial<RollOn>[]> {
+  return getCategoryProductsForAdmin<RollOn>('roll-ons', filters);
+}
+
+export async function getElixirsForAdmin(filters?: CategoryFilters): Promise<Partial<Elixir>[]> {
+  return getCategoryProductsForAdmin<Elixir>('elixirs', filters);
+}
+
 // Utility function to get all available tags across all categories
 export async function getAllCategoryTags(): Promise<string[]> {
   const allTags: string[] = [];

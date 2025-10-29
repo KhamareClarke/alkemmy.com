@@ -236,7 +236,7 @@ export default function BundleClientPage({ bundle, relatedBundles }: BundleClien
                 <div className="space-y-3">
                   {bundle.bundle_items.map((item, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                      <span className="font-medium">Product ID: {item.product_id}</span>
+                      <span className="font-medium">{item.product_name || `Product ID: ${item.product_id}`}</span>
                       <span className="text-sm text-gray-600">Qty: {item.quantity}</span>
                     </div>
                   ))}

@@ -142,13 +142,17 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
 
     setUploadingImage(true);
     try {
-      // Create a temporary URL for preview
-      const tempUrl = URL.createObjectURL(file);
+      // Convert file to base64 so it can be saved to the database
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
       
-      // For now, we'll use the temp URL. In production, you'd upload to a storage service
       setFormData(prev => ({
         ...prev,
-        images: [...prev.images, tempUrl]
+        images: [...prev.images, base64]
       }));
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -222,6 +226,7 @@ export default function BundleForm({ bundle, onSave, onCancel, loading = false }
       price: parseFloat(formData.price) || 0,
       original_price: formData.original_price ? parseFloat(formData.original_price) : undefined,
       inventory: parseInt(formData.inventory) || 0,
+      images: formData.images || [],
       bundle_items: formData.bundle_items
     };
 

@@ -53,6 +53,7 @@ export interface Bundle {
     product_id: string
     quantity: number
     product_type: string
+    product_name?: string
   }>
   inventory: number
   in_stock: boolean

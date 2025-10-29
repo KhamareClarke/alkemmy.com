@@ -147,9 +147,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (savedCart) {
         try {
           const cartItems = JSON.parse(savedCart);
-          dispatch({ type: 'LOAD_CART', payload: cartItems });
+          
+          // Clean up base64 images if present (they cause quota errors)
+          const cleanedItems = cartItems.map((item: CartItem) => {
+            const isBase64 = item.image && item.image.startsWith('data:image');
+            return {
+              ...item,
+              image: isBase64 ? '/placeholder-product.jpg' : (item.image || '/placeholder-product.jpg'),
+            };
+          });
+          
+          dispatch({ type: 'LOAD_CART', payload: cleanedItems });
+          
+          // Save cleaned items back to localStorage if any were cleaned
+          if (cleanedItems.some((item: CartItem, index: number) => 
+            item.image === '/placeholder-product.jpg' && cartItems[index].image !== '/placeholder-product.jpg'
+          )) {
+            localStorage.setItem('alkemmy-cart', JSON.stringify(cleanedItems));
+          }
         } catch (error) {
           console.error('Error loading cart from localStorage:', error);
+          // Clear corrupted cart data
+          localStorage.removeItem('alkemmy-cart');
         }
       }
       setIsLoaded(true);
@@ -159,7 +178,44 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     if (isLoaded && typeof window !== 'undefined') {
-      localStorage.setItem('alkemmy-cart', JSON.stringify(state.items));
+      try {
+        // Create a lightweight version of cart items for localStorage
+        // Exclude base64 images to prevent quota errors
+        const lightweightItems = state.items.map(item => {
+          // Only store image if it's a regular URL (not base64)
+          // Base64 images start with "data:image"
+          const isBase64 = item.image && item.image.startsWith('data:image');
+          
+          return {
+            id: item.id,
+            name: item.name,
+            image: isBase64 ? '/placeholder-product.jpg' : (item.image || '/placeholder-product.jpg'),
+            price: item.price,
+            quantity: item.quantity,
+            category: item.category,
+            slug: item.slug,
+          };
+        });
+        
+        localStorage.setItem('alkemmy-cart', JSON.stringify(lightweightItems));
+      } catch (error) {
+        // If quota exceeded, try saving without images
+        if (error instanceof Error && error.name === 'QuotaExceededError') {
+          console.warn('localStorage quota exceeded, saving cart without images');
+          const minimalItems = state.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            image: '/placeholder-product.jpg',
+            price: item.price,
+            quantity: item.quantity,
+            category: item.category,
+            slug: item.slug,
+          }));
+          localStorage.setItem('alkemmy-cart', JSON.stringify(minimalItems));
+        } else {
+          console.error('Error saving cart to localStorage:', error);
+        }
+      }
     }
   }, [state.items, isLoaded]);
 
