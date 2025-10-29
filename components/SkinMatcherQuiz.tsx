@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Check, Sparkles, Heart, Zap, Shield, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+// Progress component removed to avoid build issues
 import AddToCartButton from '@/components/AddToCartButton';
 import { getAllProductsForSkinMatcher } from '@/lib/admin-api';
 
@@ -671,7 +671,12 @@ const SkinMatcherQuiz = () => {
               {Math.round(progress)}% Complete
             </span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-[#D4AF37] h-2 rounded-full transition-all duration-300" 
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
         <Card className="shadow-2xl border-0">
