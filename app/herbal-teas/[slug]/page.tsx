@@ -7,13 +7,13 @@ import ProductClientPage from './ProductClientPage';
 export const dynamic = 'force-dynamic';
 
 interface HerbalTeaPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export default async function HerbalTeaPage({ params }: HerbalTeaPageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   
   try {
     const [product, relatedProducts] = await Promise.all([

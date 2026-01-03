@@ -4,13 +4,13 @@ import { getShampooBySlug, getRelatedShampoos } from '@/lib/category-api';
 import ProductClientPage from './ProductClientPage';
 
 interface ShampooPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export default async function ShampooPage({ params }: ShampooPageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   
   try {
     const [product, relatedProducts] = await Promise.all([

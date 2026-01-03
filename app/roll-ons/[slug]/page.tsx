@@ -4,13 +4,13 @@ import { getRollOnBySlug, getRelatedRollOns } from '@/lib/category-api';
 import ProductClientPage from './ProductClientPage';
 
 interface RollOnPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export default async function RollOnPage({ params }: RollOnPageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   
   try {
     const [product, relatedProducts] = await Promise.all([
