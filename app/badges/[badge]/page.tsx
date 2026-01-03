@@ -4,9 +4,9 @@ import { getSoaps, getHerbalTeas, getLotions, getOils, getBeardCareProducts, get
 import BadgeProductsPage from './BadgeProductsPage';
 
 interface BadgePageProps {
-  params: {
+  params: Promise<{
     badge: string;
-  };
+  }>;
 }
 
 // Valid badge types
@@ -16,7 +16,7 @@ const VALID_BADGES = [
 ];
 
 export default async function BadgePage({ params }: BadgePageProps) {
-  const { badge } = params;
+  const { badge } = await params;
   
   // Check if badge is valid
   if (!VALID_BADGES.includes(badge)) {
