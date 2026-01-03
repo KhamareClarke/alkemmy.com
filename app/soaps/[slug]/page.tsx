@@ -1,9 +1,10 @@
 import ProductClientPage from './ProductClientPage';
 import { getSoapBySlug, getRelatedSoaps } from '@/lib/category-api';
 
-export default async function SoapProductPage({ params }: { params: { slug: string } }) {
-  const product = await getSoapBySlug(params.slug);
-  const relatedProducts = await getRelatedSoaps(params.slug);
+export default async function SoapProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const product = await getSoapBySlug(slug);
+  const relatedProducts = await getRelatedSoaps(slug);
 
   if (!product) {
     return (

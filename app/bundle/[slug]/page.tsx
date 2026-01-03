@@ -2,9 +2,10 @@ import BundleClientPage from './BundleClientPage';
 import { getBundleBySlug, getRelatedBundles } from '@/lib/admin-api';
 
 // Dynamic route for bundle pages
-export default async function BundlePage({ params }: { params: { slug: string } }) {
-  const bundle = await getBundleBySlug(params.slug);
-  const relatedBundles = await getRelatedBundles(params.slug);
+export default async function BundlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const bundle = await getBundleBySlug(slug);
+  const relatedBundles = await getRelatedBundles(slug);
 
   if (!bundle) {
     return (

@@ -1,9 +1,10 @@
 import ProductClientPage from './ProductClientPage';
 import { getLotionBySlug, getRelatedLotions } from '@/lib/category-api';
 
-export default async function LotionProductPage({ params }: { params: { slug: string } }) {
-  const product = await getLotionBySlug(params.slug);
-  const relatedProducts = await getRelatedLotions(params.slug);
+export default async function LotionProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const product = await getLotionBySlug(slug);
+  const relatedProducts = await getRelatedLotions(slug);
 
   if (!product) {
     return (

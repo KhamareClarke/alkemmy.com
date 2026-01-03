@@ -3,9 +3,10 @@ import { getProductBySlug, getRelatedProducts } from '@/lib/products';
 
 // Dynamic route - no static generation needed
 
-export default async function ProductPage({ params }: { params: { slug: string } }) {
-  const product = await getProductBySlug(params.slug);
-  const relatedProducts = await getRelatedProducts(params.slug);
+export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  const relatedProducts = await getRelatedProducts(slug);
 
   if (!product) {
     return (

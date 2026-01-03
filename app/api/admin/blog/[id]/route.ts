@@ -4,11 +4,11 @@ import { adminSupabase } from '@/lib/admin-supabase';
 // PUT - Update a blog post
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const postData = await request.json();
-    const { id } = params;
+    const { id } = await params;
 
     // Validate required fields
     if (!postData.title || !postData.slug || !postData.content) {
@@ -69,10 +69,10 @@ export async function PUT(
 // DELETE - Delete a blog post
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const { error } = await adminSupabase
       .from('blog_posts')
