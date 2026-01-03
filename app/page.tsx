@@ -644,14 +644,14 @@ export default function Home() {
                     <div className="aspect-[3/4] mb-8 overflow-hidden relative group rounded-sm product-shadow">
                       <img
                         src={featuredProducts[0].images[0] || '/placeholder-product.jpg'}
-                        alt={featuredProducts[0].name}
+                        alt={featuredProducts[0].title}
                         className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
                       <ProductBadge product={featuredProducts[0]} className="absolute top-6 left-6" />
                     </div>
                     <h3 className="text-2xl font-serif font-medium mb-3 elite-spacing" style={{color: 'var(--warm-white)'}}>
-                      {featuredProducts[0].name}
+                      {featuredProducts[0].title}
                     </h3>
                     <p className="text-lg font-medium" style={{color: 'var(--warm-white-60)'}}>£{featuredProducts[0].price}</p>
                   </Link>
@@ -672,14 +672,14 @@ export default function Home() {
                       <div className="aspect-[3/4] mb-5 overflow-hidden relative group rounded-sm product-shadow">
                         <img
                           src={product.images[0] || '/placeholder-product.jpg'}
-                          alt={product.name}
+                          alt={product.title}
                           className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
                         <ProductBadge product={product} className="absolute top-4 left-4" />
                       </div>
                       <h3 className="text-lg font-serif font-medium mb-2 elite-spacing" style={{color: 'var(--warm-white)'}}>
-                        {product.name}
+                        {product.title}
                       </h3>
                       <p className="text-base font-medium" style={{color: 'var(--warm-white-60)'}}>£{product.price}</p>
                     </Link>
