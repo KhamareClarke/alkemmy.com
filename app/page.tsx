@@ -676,7 +676,7 @@ export default function Home() {
                           className="w-full h-full object-cover transition-all duration-700 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
-                        <ProductBadge product={product} className="absolute top-4 left-4" />
+                        <ProductBadge badge={getProductBadge(product, index + 1).toLowerCase().replace(/\s+/g, '_')} className="absolute top-4 left-4" />
                       </div>
                       <h3 className="text-lg font-serif font-medium mb-2 elite-spacing" style={{color: 'var(--warm-white)'}}>
                         {product.title}
