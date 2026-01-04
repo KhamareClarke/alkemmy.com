@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { Filter, Grid, List, Star, ShoppingCart, Heart, Search, Check, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -75,7 +75,7 @@ const CategorySection = ({ title, subtitle, products, ratings, viewMode }: { tit
   );
 };
 
-export default function ShopPage() {
+function ShopPageContent() {
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -478,5 +478,20 @@ export default function ShopPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading shop...</p>
+        </div>
+      </div>
+    }>
+      <ShopPageContent />
+    </Suspense>
   );
 }
