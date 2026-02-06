@@ -250,19 +250,89 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   try {
     // Get metadata from session
     const metadata = session.metadata;
-    if (!metadata) {
-      console.error('No metadata found in checkout session');
+    const tempOrderId = metadata?.to || metadata?.tempOrderId; // Support both old and new format
+    if (!tempOrderId) {
+      console.error('No tempOrderId found in checkout session metadata');
       return;
     }
 
-    const userId = metadata.userId === 'guest' ? undefined : metadata.userId;
-    const orderData = JSON.parse(metadata.orderData);
-    const cartItems = JSON.parse(metadata.cartItems);
+    // Retrieve temporary order
+    const { data: tempOrder, error: tempOrderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', tempOrderId)
+      .single();
+
+    if (tempOrderError || !tempOrder) {
+      console.error('Error retrieving temporary order:', tempOrderError);
+      return;
+    }
+
+    // Try to get order data from checkout_sessions table first
+    let orderData: any;
+    let cartItems: any[];
+    
+    const { data: checkoutSession } = await supabase
+      .from('checkout_sessions')
+      .select('*')
+      .eq('temp_order_id', tempOrderId)
+      .single();
+
+    if (checkoutSession) {
+      // Use data from checkout_sessions table
+      orderData = checkoutSession.order_data;
+      cartItems = checkoutSession.cart_items;
+    } else {
+      // Fall back to parsing from notes (compact format)
+      const orderNotes = JSON.parse(tempOrder.notes || '{}');
+      
+      // Reconstruct order data from compact format
+      if (orderNotes.email) {
+        // Compact format - reconstruct full order data
+        const { data: tempAddress } = await supabase
+          .from('addresses')
+          .select('*')
+          .eq('id', tempOrder.shipping_address_id)
+          .single();
+
+        if (tempAddress) {
+          orderData = {
+            shippingAddress: {
+              firstName: tempAddress.first_name,
+              lastName: tempAddress.last_name,
+              email: tempAddress.email,
+              phone: tempAddress.phone,
+              addressLine1: tempAddress.address_line_1,
+              addressLine2: tempAddress.address_line_2,
+              city: tempAddress.city,
+              state: tempAddress.state,
+              postalCode: tempAddress.postal_code,
+              country: tempAddress.country,
+            },
+            billingSameAsShipping: true,
+            paymentMethod: 'stripe',
+            saveAddress: false,
+          };
+          
+          // Reconstruct cart items from compact format
+          cartItems = orderNotes.items || [];
+        } else {
+          console.error('Could not retrieve temporary address');
+          return;
+        }
+      } else {
+        // Old format - try to parse
+        orderData = orderNotes.orderData;
+        cartItems = orderNotes.cartItems;
+      }
+    }
+
+    const userId = (metadata?.uid || metadata?.userId) === 'guest' ? undefined : (metadata?.uid || metadata?.userId);
 
     // Import createOrder function
     const { createOrder } = await import('@/lib/order-api');
 
-    // Create the order
+    // Create the actual order (this will create addresses and order items)
     const { order, orderItems } = await createOrder(orderData, cartItems, userId);
 
     // Get payment intent ID if available
@@ -291,6 +361,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       .from('orders')
       .update({ notes: notesUpdate })
       .eq('id', order.id);
+
+    // Clean up temporary data
+    // Delete checkout session if it exists
+    await supabase
+      .from('checkout_sessions')
+      .delete()
+      .eq('temp_order_id', tempOrderId);
+
+    // Delete temporary address
+    if (tempOrder.shipping_address_id) {
+      await supabase
+        .from('addresses')
+        .delete()
+        .eq('id', tempOrder.shipping_address_id);
+    }
+    
+    // Delete temporary order
+    await supabase
+      .from('orders')
+      .delete()
+      .eq('id', tempOrderId);
 
     // Get shipping address for email
     const { data: shippingAddress } = await supabase

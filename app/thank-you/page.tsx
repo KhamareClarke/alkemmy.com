@@ -32,7 +32,7 @@ function ThankYouPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const orderId = searchParams.get('order_id');
-  const sessionId = searchParams.get('session_id');
+  const sessionId = searchParams.get('session_id') || searchParams.get('sid'); // Support both formats
 
   useEffect(() => {
     if (orderId) {
@@ -62,8 +62,8 @@ function ThankYouPageContent() {
 
   const findOrderBySessionId = async (sessionId: string) => {
     try {
-      // Call API to find order by session ID
-      const response = await fetch(`/api/get-order-by-session?session_id=${sessionId}`);
+      // Call API to find order by session ID (use short parameter to avoid URL length issues)
+      const response = await fetch(`/api/get-order-by-session?sid=${sessionId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.order) {

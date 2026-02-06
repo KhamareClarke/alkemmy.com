@@ -43,8 +43,12 @@ function CheckoutPageContent() {
     // If Stripe is selected, redirect to Stripe Checkout
     if (data.paymentMethod === 'stripe') {
       setIsProcessing(true);
+      setError(null); // Clear any previous errors
+      
       try {
         const baseUrl = window.location.origin;
+        console.log('Creating Stripe Checkout session...');
+        
         const response = await fetch('/api/create-checkout-session', {
           method: 'POST',
           headers: {
@@ -54,8 +58,8 @@ function CheckoutPageContent() {
             cartItems: cartState.items,
             orderData: data,
             userId: user?.id,
-            successUrl: `${baseUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${baseUrl}/checkout?canceled=true`,
+            successUrl: `${baseUrl}/thank-you?sid={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${baseUrl}/checkout?canceled=1`,
           }),
         });
 
@@ -65,21 +69,27 @@ function CheckoutPageContent() {
           // Show more detailed error message
           const errorMsg = result.error || 'Failed to create checkout session';
           console.error('Checkout session error:', result);
-          throw new Error(errorMsg);
+          setError(errorMsg);
+          setIsProcessing(false);
+          return;
         }
 
-        // Redirect to Stripe Checkout
+        // Redirect to Stripe Checkout immediately - CRITICAL: Must redirect, not show form
         if (result.url) {
-          window.location.href = result.url;
+          console.log('✅ Redirecting to Stripe Checkout:', result.url);
+          // CRITICAL: Use replace for immediate redirect - no embedded form should show
+          window.location.replace(result.url);
+          // Don't set processing to false - we're redirecting away
+          return; // Exit immediately - redirect is happening
         } else {
           throw new Error('No checkout URL returned');
         }
       } catch (err) {
-        console.error('Checkout session creation error:', err);
+        console.error('❌ Checkout session creation error:', err);
         setError(err instanceof Error ? err.message : 'Failed to redirect to payment');
         setIsProcessing(false);
       }
-      return;
+      return; // Always return to prevent further execution
     }
 
     // If cash on delivery, process order immediately
@@ -95,99 +105,7 @@ function CheckoutPageContent() {
     }
   };
 
-  const handleStripePaymentSuccess = async (paymentIntent: any) => {
-    if (!checkoutData) {
-      setError('Checkout data is missing. Please try again.');
-      return;
-    }
-
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      console.log('Processing Stripe payment order with payment intent:', paymentIntent.id);
-      const result = await processOrder(checkoutData, paymentIntent.id);
-      
-      // Send payment success email via API
-      if (result && result.order && result.orderItems) {
-        try {
-          await fetch('/api/send-payment-success-email', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              orderNumber: result.order.order_number,
-              customerName: `${checkoutData.shippingAddress.firstName} ${checkoutData.shippingAddress.lastName}`,
-              customerEmail: checkoutData.shippingAddress.email,
-              totalAmount: result.order.total_amount,
-              paymentMethod: 'stripe',
-              paymentIntentId: paymentIntent.id,
-              orderDate: new Date().toLocaleDateString('en-GB', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              }),
-              items: result.orderItems.map((item: any) => ({
-                name: item.product_name,
-                quantity: item.quantity,
-                price: item.price
-              }))
-            }),
-          });
-        } catch (emailError) {
-          console.error('Failed to send payment success email:', emailError);
-          // Don't fail the order if email fails
-        }
-      }
-    } catch (err) {
-      console.error('Stripe payment processing error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to process payment');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleStripePaymentError = async (error: string) => {
-    setError(error);
-    setIsProcessing(false);
-    
-    // Send payment failed email via API
-    if (checkoutData) {
-      try {
-        await fetch('/api/send-payment-failed-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            customerName: `${checkoutData.shippingAddress.firstName} ${checkoutData.shippingAddress.lastName}`,
-            customerEmail: checkoutData.shippingAddress.email,
-            totalAmount: total,
-            paymentMethod: 'stripe',
-            errorMessage: error,
-            orderDate: new Date().toLocaleDateString('en-GB', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            items: cartState.items.map(item => ({
-              name: item.name,
-              quantity: item.quantity,
-              price: item.price
-            }))
-          }),
-        });
-      } catch (emailError) {
-        console.error('Failed to send payment failed email:', emailError);
-        // Don't show error to user if email fails
-      }
-    }
-  };
+  // Removed old embedded payment handlers - now using Stripe Checkout redirect
 
   const processOrder = async (data: OrderData, paymentIntentId: string | null) => {
     try {
@@ -297,11 +215,20 @@ function CheckoutPageContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Left Column - Forms */}
           <div className="lg:col-span-2">
-            <CheckoutForm
-              onSubmit={handleCheckoutSubmit}
-              isLoading={isProcessing}
-              error={error ?? undefined}
-            />
+            {isProcessing && selectedPaymentMethod === 'stripe' ? (
+              <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Redirecting to Stripe Checkout...</h2>
+                <p className="text-gray-600">Please wait while we redirect you to complete your payment securely.</p>
+                <p className="text-sm text-gray-500 mt-2">If you are not redirected automatically, please check your browser console.</p>
+              </div>
+            ) : (
+              <CheckoutForm
+                onSubmit={handleCheckoutSubmit}
+                isLoading={isProcessing}
+                error={error ?? undefined}
+              />
+            )}
           </div>
 
           {/* Right Column - Order Summary */}
