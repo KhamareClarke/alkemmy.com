@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sendOrderConfirmationEmail, sendAdminNotificationEmail } from '@/lib/email-service';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-10-29.clover',
+  apiVersion: '2025-02-24.acacia',
 }) : null;
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
