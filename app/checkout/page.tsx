@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
 import CheckoutForm from '@/components/checkout/CheckoutForm';
 import OrderSummary from '@/components/checkout/OrderSummary';
-import StripePayment from '@/components/checkout/StripePayment';
 import { OrderData } from '@/lib/order-api';
 import { Home, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { state: cartState, dispatch } = useCart();
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -21,7 +21,14 @@ export default function CheckoutPage() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'stripe' | 'cash_on_delivery'>('stripe');
   const [checkoutData, setCheckoutData] = useState<any>(null);
-  const [showStripePayment, setShowStripePayment] = useState(false);
+
+  // Check if user was redirected from canceled Stripe Checkout
+  useEffect(() => {
+    const canceled = searchParams.get('canceled');
+    if (canceled === 'true') {
+      setError('Payment was canceled. You can try again or choose a different payment method.');
+    }
+  }, [searchParams]);
 
   const subtotal = cartState.totalPrice;
   const shipping = subtotal > 50 ? 0 : 4.99;
@@ -33,10 +40,46 @@ export default function CheckoutPage() {
     setCheckoutData(data);
     setSelectedPaymentMethod(data.paymentMethod);
 
-    // If Stripe is selected, show Stripe payment form
+    // If Stripe is selected, redirect to Stripe Checkout
     if (data.paymentMethod === 'stripe') {
-      setShowStripePayment(true);
-      return; // Don't process order yet, wait for Stripe payment
+      setIsProcessing(true);
+      try {
+        const baseUrl = window.location.origin;
+        const response = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            cartItems: cartState.items,
+            orderData: data,
+            userId: user?.id,
+            successUrl: `${baseUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${baseUrl}/checkout?canceled=true`,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          // Show more detailed error message
+          const errorMsg = result.error || 'Failed to create checkout session';
+          console.error('Checkout session error:', result);
+          throw new Error(errorMsg);
+        }
+
+        // Redirect to Stripe Checkout
+        if (result.url) {
+          window.location.href = result.url;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
+      } catch (err) {
+        console.error('Checkout session creation error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to redirect to payment');
+        setIsProcessing(false);
+      }
+      return;
     }
 
     // If cash on delivery, process order immediately
@@ -254,49 +297,11 @@ export default function CheckoutPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Left Column - Forms */}
           <div className="lg:col-span-2">
-            {!showStripePayment ? (
-              <CheckoutForm
-                onSubmit={handleCheckoutSubmit}
-                isLoading={isProcessing}
-                error={error ?? undefined}
-              />
-            ) : (
-              <div className="space-y-6">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-[#D4AF37] to-[#B8941F] text-black p-6 rounded-lg">
-                  <h2 className="text-2xl font-bold mb-2">Complete Your Payment</h2>
-                  <p className="text-black/80">Enter your card details to complete your order</p>
-                </div>
-
-                {/* Back Button */}
-                <button
-                  onClick={() => {
-                    setShowStripePayment(false);
-                    setError(null);
-                  }}
-                  className="text-[#D4AF37] hover:text-[#B8941F] font-medium flex items-center gap-2 mb-4"
-                >
-                  ← Back to Checkout
-                </button>
-
-                {/* Error Display */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
-                    {error}
-                  </div>
-                )}
-
-                {/* Stripe Payment Component */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                  <StripePayment
-                    amount={total}
-                    onSuccess={handleStripePaymentSuccess}
-                    onError={handleStripePaymentError}
-                    isLoading={isProcessing}
-                  />
-                </div>
-              </div>
-            )}
+            <CheckoutForm
+              onSubmit={handleCheckoutSubmit}
+              isLoading={isProcessing}
+              error={error ?? undefined}
+            />
           </div>
 
           {/* Right Column - Order Summary */}
@@ -309,5 +314,20 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading checkout...</p>
+        </div>
+      </div>
+    }>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }

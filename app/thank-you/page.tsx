@@ -32,14 +32,18 @@ function ThankYouPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const orderId = searchParams.get('order_id');
+  const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
     if (orderId) {
       loadOrderDetails(orderId);
+    } else if (sessionId) {
+      // If we have a session_id from Stripe Checkout, find the order
+      findOrderBySessionId(sessionId);
     } else {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, sessionId]);
 
   const loadOrderDetails = async (id: string) => {
     try {
@@ -52,6 +56,29 @@ function ThankYouPageContent() {
     } catch (err) {
       setError('Failed to load order details');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const findOrderBySessionId = async (sessionId: string) => {
+    try {
+      // Call API to find order by session ID
+      const response = await fetch(`/api/get-order-by-session?session_id=${sessionId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.order) {
+          setOrder(data.order as OrderDetails);
+        } else {
+          // Order might still be processing via webhook, show success message
+          setLoading(false);
+        }
+      } else {
+        // Order might still be processing via webhook, show success message
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Error finding order by session:', err);
+      // Order might still be processing via webhook, show success message
       setLoading(false);
     }
   };

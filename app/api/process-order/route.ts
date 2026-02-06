@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the order
-    const { order, orderItems } = await createOrder(orderData, cartItems, userId);
+    // Create the order (pass paymentIntentId if available)
+    const { order, orderItems } = await createOrder(orderData, cartItems, userId, paymentIntentId);
 
     // If payment was successful, update the order status
     if (paymentIntentId) {

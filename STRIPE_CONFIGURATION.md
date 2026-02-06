@@ -53,18 +53,49 @@ If you need to test, you can temporarily switch to test keys:
 - Test cards: https://stripe.com/docs/testing
 - Use test keys starting with `pk_test_` and `sk_test_`
 
-### 4. Webhook Configuration (Optional but Recommended)
-For production, set up Stripe webhooks to handle:
-- Payment confirmations
-- Refunds
-- Failed payments
+### 4. Webhook Configuration ✅ (Now Implemented!)
+Stripe webhooks are now fully configured to handle checkout completion events automatically.
 
 **Webhook Endpoint**: `https://yourdomain.com/api/webhooks/stripe`
 
-**Events to listen for**:
-- `payment_intent.succeeded`
-- `payment_intent.payment_failed`
-- `charge.refunded`
+#### Events Handled:
+- ✅ `payment_intent.succeeded` - Automatically marks orders as paid when payment completes
+- ✅ `payment_intent.payment_failed` - Marks orders as failed when payment fails
+- ✅ `checkout.session.completed` - Handles Stripe Checkout session completion
+
+#### Setting Up Webhooks in Stripe Dashboard:
+
+1. **Go to Stripe Dashboard** → Developers → Webhooks
+2. **Click "Add endpoint"**
+3. **Enter your webhook URL**: `https://yourdomain.com/api/webhooks/stripe`
+4. **Select events to listen for**:
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `checkout.session.completed`
+5. **Copy the webhook signing secret** (starts with `whsec_`)
+6. **Add to your `.env.local` file**:
+   ```
+   STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+   ```
+
+#### Testing Webhooks Locally:
+
+Use Stripe CLI to test webhooks locally:
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+This will give you a webhook secret for local testing.
+
+#### Database Migration:
+
+Run the migration to add `payment_intent_id` column to orders table:
+```sql
+-- File: lib/add-payment-intent-id-column.sql
+-- Run this in your Supabase SQL editor
+```
+
+This allows efficient order lookup by payment intent ID.
 
 ## 📋 Current Configuration
 

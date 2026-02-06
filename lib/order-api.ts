@@ -68,7 +68,8 @@ function generateOrderNumber(): string {
 export async function createOrder(
   orderData: OrderData,
   cartItems: CartItem[],
-  userId?: string
+  userId?: string,
+  paymentIntentId?: string
 ): Promise<{ order: Order; orderItems: OrderItem[] }> {
   try {
     const orderNumber = generateOrderNumber();
@@ -127,20 +128,38 @@ export async function createOrder(
     }
 
     // Create order
+    const orderNotes = orderData.paymentMethod === 'cash_on_delivery' 
+      ? 'Cash on delivery order' 
+      : orderData.paymentMethod === 'paypal' 
+        ? 'PayPal payment order' 
+        : paymentIntentId 
+          ? `Stripe payment order - Payment Intent ID: ${paymentIntentId}`
+          : 'Stripe payment order';
+
+    const orderDataToInsert: any = {
+      user_id: userId || null,
+      order_number: orderNumber,
+      status: 'pending',
+      total_amount: finalTotal,
+      shipping_address_id: shippingAddress.id,
+      billing_address_id: billingAddressId,
+      payment_method: orderData.paymentMethod,
+      payment_status: orderData.paymentMethod === 'cash_on_delivery' ? 'pending' : 'pending',
+      notes: orderNotes,
+    };
+
+    // Add payment_intent_id if provided and column exists
+    if (paymentIntentId) {
+      try {
+        orderDataToInsert.payment_intent_id = paymentIntentId;
+      } catch (e) {
+        // Column might not exist, that's okay - it's in notes
+      }
+    }
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        user_id: userId || null,
-        order_number: orderNumber,
-        status: 'pending',
-        total_amount: finalTotal,
-        shipping_address_id: shippingAddress.id,
-        billing_address_id: billingAddressId,
-        payment_method: orderData.paymentMethod,
-        payment_status: orderData.paymentMethod === 'cash_on_delivery' ? 'pending' : 'pending',
-        notes: orderData.paymentMethod === 'cash_on_delivery' ? 'Cash on delivery order' : 
-               orderData.paymentMethod === 'paypal' ? 'PayPal payment order' : 'Stripe payment order',
-      })
+      .insert(orderDataToInsert)
       .select()
       .single();
 
@@ -180,13 +199,37 @@ export async function updateOrderPaymentStatus(
   paymentIntentId?: string
 ): Promise<void> {
   try {
+    const updateData: any = {
+      payment_status: paymentStatus,
+      status: paymentStatus === 'paid' ? 'processing' : 'pending',
+      updated_at: new Date().toISOString(),
+    };
+
+    // Store payment_intent_id if provided (column may or may not exist)
+    if (paymentIntentId) {
+      // Try to update payment_intent_id column if it exists
+      try {
+        updateData.payment_intent_id = paymentIntentId;
+      } catch (e) {
+        // If column doesn't exist, store in notes
+        const { data: order } = await supabase
+          .from('orders')
+          .select('notes')
+          .eq('id', orderId)
+          .single();
+        
+        if (order) {
+          const existingNotes = order.notes || '';
+          updateData.notes = existingNotes 
+            ? `${existingNotes}\nPayment Intent ID: ${paymentIntentId}`
+            : `Payment Intent ID: ${paymentIntentId}`;
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('orders')
-      .update({
-        payment_status: paymentStatus,
-        status: paymentStatus === 'paid' ? 'processing' : 'pending',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', orderId);
 
     if (error) throw error;
