@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { sendOrderConfirmationEmail, sendAdminNotificationEmail } from '@/lib/email-service';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-02-24.acacia',
+  apiVersion: '2025-10-29.clover',
 }) : null;
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -287,7 +287,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       const orderNotes = JSON.parse(tempOrder.notes || '{}');
       
       // Reconstruct order data from compact format
-      if (orderNotes.email) {
+      // Support both old format (email) and new ultra-compact format (e)
+      const hasEmail = orderNotes.email || orderNotes.e;
+      
+      if (hasEmail) {
         // Compact format - reconstruct full order data
         const { data: tempAddress } = await supabase
           .from('addresses')
@@ -315,7 +318,56 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
           };
           
           // Reconstruct cart items from compact format
-          cartItems = orderNotes.items || [];
+          // Support both old format (items) and new ultra-compact format (i)
+          const items = orderNotes.items || orderNotes.i || [];
+          
+          // Fetch full product data from database to reconstruct cart items
+          const productIds = items.map((item: any) => item.id);
+          if (productIds.length > 0) {
+            const { data: products, error: productsError } = await supabase
+              .from('products')
+              .select('id, name, image, price')
+              .in('id', productIds);
+            
+            if (!productsError && products) {
+              // Map products to cart items with quantities and prices from compact data
+              cartItems = items.map((item: any) => {
+                const product = products.find((p: any) => p.id === item.id);
+                if (product) {
+                  return {
+                    id: product.id,
+                    name: product.name,
+                    image: product.image || '',
+                    quantity: item.qty || item.q || 1,
+                    price: item.price || item.p || product.price || 0,
+                    slug: '', // Not needed for order creation
+                  };
+                }
+                // Fallback if product not found
+                return {
+                  id: item.id,
+                  name: 'Product',
+                  image: '',
+                  quantity: item.qty || item.q || 1,
+                  price: item.price || item.p || 0,
+                  slug: '',
+                };
+              });
+            } else {
+              console.error('Error fetching products for cart reconstruction:', productsError);
+              // Fallback to minimal cart items
+              cartItems = items.map((item: any) => ({
+                id: item.id,
+                name: 'Product',
+                image: '',
+                quantity: item.qty || item.q || 1,
+                price: item.price || item.p || 0,
+                slug: '',
+              }));
+            }
+          } else {
+            cartItems = [];
+          }
         } else {
           console.error('Could not retrieve temporary address');
           return;

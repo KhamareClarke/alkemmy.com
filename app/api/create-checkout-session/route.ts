@@ -56,21 +56,25 @@ export async function POST(request: NextRequest) {
     });
 
     // Create line items for Stripe
+    // For large carts, minimize data to avoid URL length issues
+    const isLargeCart = cartItems.length > 5;
     const lineItems = cartItems.map((item: any) => {
-      // Truncate product name to 100 chars to avoid URL length issues
-      const productName = (item.name || 'Product').substring(0, 100);
+      // Truncate product name aggressively - 50 chars max for large carts, 80 for small
+      const maxNameLength = isLargeCart ? 50 : 80;
+      const productName = (item.name || 'Product').substring(0, maxNameLength);
       
       const productData: any = {
         name: productName,
       };
       
-      // Only include description if it exists and is not empty, and truncate to 200 chars
-      if (item.description && item.description.trim() !== '') {
-        productData.description = item.description.substring(0, 200);
+      // Only include description for small carts and truncate to 100 chars
+      if (!isLargeCart && item.description && item.description.trim() !== '') {
+        productData.description = item.description.substring(0, 100);
       }
       
-      // Handle images - Stripe requires full URLs (only include if valid)
-      if (item.image && item.image.trim() !== '') {
+      // Skip images for large carts to reduce URL length
+      // Only include images for small carts (3 or fewer items)
+      if (cartItems.length <= 3 && item.image && item.image.trim() !== '') {
         // Convert relative URLs to absolute URLs if needed
         let imageUrl = item.image.trim();
         if (imageUrl.startsWith('/')) {
@@ -184,16 +188,17 @@ export async function POST(request: NextRequest) {
 
       if (sessionError) {
         console.warn('checkout_sessions table may not exist, using fallback:', sessionError);
-        // Fall back to compact format in notes if table doesn't exist
+        // Fall back to ultra-compact format in notes if table doesn't exist
+        // Only store minimal data: product IDs and quantities
         const compactData = {
-          email: orderData.shippingAddress.email,
-          name: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`,
-          items: cartItems.map((item: any) => ({
+          e: orderData.shippingAddress.email, // 'e' for email
+          n: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`, // 'n' for name
+          i: cartItems.map((item: any) => ({
             id: item.id,
-            qty: item.quantity,
-            price: item.price
+            q: item.quantity, // 'q' for quantity
+            p: item.price // 'p' for price
           })),
-          totals: { subtotal, shipping, total }
+          t: { s: subtotal, sh: shipping, tot: total } // 't' for totals, 's' for subtotal, 'sh' for shipping, 'tot' for total
         };
         
         await supabase
@@ -203,16 +208,16 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       console.warn('Error storing checkout session data, using fallback:', err);
-      // Use compact format as fallback
+      // Use ultra-compact format as fallback
       const compactData = {
-        email: orderData.shippingAddress.email,
-        name: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`,
-        items: cartItems.map((item: any) => ({
+        e: orderData.shippingAddress.email, // 'e' for email
+        n: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`, // 'n' for name
+        i: cartItems.map((item: any) => ({
           id: item.id,
-          qty: item.quantity,
-          price: item.price
+          q: item.quantity, // 'q' for quantity
+          p: item.price // 'p' for price
         })),
-        totals: { subtotal, shipping, total }
+        t: { s: subtotal, sh: shipping, tot: total } // 't' for totals
       };
       
       await supabase
