@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Package, Truck, Mail, ArrowLeft, Home } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
-import { getOrderById } from '@/lib/order-api';
+import { getOrderById } from '@/lib/order-api';N
 import Image from 'next/image';
-
+IMPORT NEXT
 interface OrderDetails {
   id: string;
   order_number: string;

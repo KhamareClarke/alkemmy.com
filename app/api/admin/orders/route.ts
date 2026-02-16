@@ -54,55 +54,47 @@ async function sendStatusUpdateEmailAsync(currentOrder: any, status: string, pre
 
 export async function GET() {
   try {
-    // First get all orders
+    // Simple queries avoid statement timeout - no heavy joins
     const { data: ordersData, error: ordersError } = await adminSupabase
       .from('orders')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (ordersError) {
+      console.error('Orders fetch error:', ordersError);
       return NextResponse.json({ error: 'Failed to load orders' }, { status: 500 });
     }
 
-    // Then enrich each order with related data
-    const enrichedOrders = await Promise.all(
-      (ordersData || []).map(async (order) => {
-        // Get shipping address
-        let shipping_address = null;
-        if (order.shipping_address_id) {
-          const { data: addressData } = await adminSupabase
-            .from('addresses')
-            .select('*')
-            .eq('id', order.shipping_address_id)
-            .single();
-          shipping_address = addressData;
-        }
+    const orders = ordersData || [];
+    if (orders.length === 0) {
+      return NextResponse.json({ orders: [] });
+    }
 
-        // Get order items
-        const { data: orderItems } = await adminSupabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', order.id);
+    const addressIds = [...new Set(orders.map((o: any) => o.shipping_address_id).filter(Boolean))];
+    const userIds = [...new Set(orders.map((o: any) => o.user_id).filter(Boolean))];
+    const orderIds = orders.map((o: any) => o.id);
 
-        // Get user info if user_id exists
-        let user = null;
-        if (order.user_id) {
-          const { data: userData } = await adminSupabase
-            .from('profiles')
-            .select('*')
-            .eq('id', order.user_id)
-            .single();
-          user = userData;
-        }
+    // Parallel batch fetches - each query is fast
+    const [addressesRes, orderItemsRes, profilesRes] = await Promise.all([
+      addressIds.length > 0 ? adminSupabase.from('addresses').select('*').in('id', addressIds) : { data: [] },
+      adminSupabase.from('order_items').select('*').in('order_id', orderIds),
+      userIds.length > 0 ? adminSupabase.from('profiles').select('*').in('id', userIds) : { data: [] }
+    ]);
 
-        return {
-          ...order,
-          shipping_address,
-          order_items: orderItems || [],
-          user
-        };
-      })
-    );
+    const addressesMap = new Map((addressesRes.data || []).map((a: any) => [a.id, a]));
+    const orderItemsByOrder = (orderItemsRes.data || []).reduce((acc: Record<string, any[]>, item: any) => {
+      (acc[item.order_id] ??= []).push(item);
+      return acc;
+    }, {});
+    const profilesMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
+
+    const enrichedOrders = orders.map((order: any) => ({
+      ...order,
+      shipping_address: order.shipping_address_id ? addressesMap.get(order.shipping_address_id) ?? null : null,
+      order_items: orderItemsByOrder[order.id] ?? [],
+      user: order.user_id ? profilesMap.get(order.user_id) ?? null : null
+    }));
 
     return NextResponse.json({ orders: enrichedOrders });
   } catch (error) {

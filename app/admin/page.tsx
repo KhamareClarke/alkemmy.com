@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Plus, Edit, Trash2, Eye, Search, Filter, Save, X, Users, ShoppingBag, Package, Clock, CheckCircle, Truck, AlertCircle, RefreshCw, Mail, Send, FileText, Star, Download, BookOpen, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -160,6 +161,7 @@ const CATEGORY_FILTERS = {
 };
 
 export default function AdminPage() {
+  const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -194,6 +196,8 @@ export default function AdminPage() {
     users: false,
     orders: false
   });
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const ordersLoadInProgress = useRef(false);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [orderSearchTerm, setOrderSearchTerm] = useState('');
@@ -325,7 +329,7 @@ export default function AdminPage() {
   // Hardcoded admin password - change this to your desired password
   const ADMIN_PASSWORD = 'alkemmy2024';
 
-  // Check authentication status on component mount
+  // Check authentication status and restore tab on component mount
   useEffect(() => {
     const authStatus = localStorage.getItem('admin_authenticated');
     const authTime = localStorage.getItem('admin_auth_time');
@@ -338,12 +342,19 @@ export default function AdminPage() {
       
       if (now - authTimestamp < twentyFourHours) {
         setIsAuthenticated(true);
+        // Restore active tab from sessionStorage (e.g. when refreshing on orders tab)
+        const savedTab = sessionStorage.getItem('admin_active_tab');
+        const validTabs = ['products', 'bundles', 'users', 'orders', 'emails', 'reviews', 'blog'];
+        if (savedTab && validTabs.includes(savedTab)) {
+          setActiveTab(savedTab as typeof activeTab);
+        }
       } else {
         // Authentication expired
         localStorage.removeItem('admin_authenticated');
         localStorage.removeItem('admin_auth_time');
       }
     }
+    setAuthChecked(true);
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -386,12 +397,17 @@ export default function AdminPage() {
   };
 
   const loadOrders = async () => {
+    if (ordersLoadInProgress.current) return; // Prevent duplicate concurrent requests
+    ordersLoadInProgress.current = true;
+    setOrdersError(null);
+    setLoading(true);
     try {
       const response = await fetch('/api/admin/orders');
       const data = await response.json();
 
       if (!response.ok) {
-        alert(`Failed to load orders: ${data.error || 'Unknown error'}`);
+        const errorMsg = data.error || 'Unknown error';
+        setOrdersError(`Failed to load orders: ${errorMsg}`);
         return;
       } else {
         const ordersData = data.orders || [];
@@ -409,7 +425,10 @@ export default function AdminPage() {
         setOrderMetrics(metrics);
       }
     } catch (error) {
-      alert('Error loading orders. Please check your connection.');
+      setOrdersError('Error loading orders. Please check your connection.');
+    } finally {
+      setLoading(false);
+      ordersLoadInProgress.current = false;
     }
   };
 
@@ -838,8 +857,9 @@ export default function AdminPage() {
     }));
   };
 
-  // Load data when active tab changes
+  // Load data when active tab changes (only when authenticated)
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (activeTab === 'bundles') {
       loadBundles();
     } else if (activeTab === 'users') {
@@ -851,13 +871,22 @@ export default function AdminPage() {
     } else if (activeTab === 'reviews') {
       loadReviews();
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
-  // Load users immediately when component mounts
+  // Load users and orders when authenticated (fixes refresh error - don't load before auth is ready)
   useEffect(() => {
-    loadUsers();
-    loadOrders();
-  }, []);
+    if (isAuthenticated) {
+      loadUsers();
+      loadOrders();
+    }
+  }, [isAuthenticated]);
+
+  // Persist active tab to sessionStorage so it survives page refresh
+  useEffect(() => {
+    if (isAuthenticated) {
+      sessionStorage.setItem('admin_active_tab', activeTab);
+    }
+  }, [activeTab, isAuthenticated]);
 
   // Load products for selected category (optimized for admin - excludes large fields)
   useEffect(() => {
@@ -1089,6 +1118,18 @@ export default function AdminPage() {
     return matchesSearch && matchesFilters;
   });
 
+  // Show loading while checking auth (prevents flash of login form on refresh)
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show login form if not authenticated
   if (!isAuthenticated) {
     return (
@@ -1189,15 +1230,22 @@ export default function AdminPage() {
                 </Button>
               )}
               {activeTab === 'orders' && (
-                <Button 
-                  onClick={refreshOrders} 
-                  variant="outline" 
-                  className="border-gray-300 hover:bg-gray-50"
-                  disabled={refreshing.orders}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing.orders ? 'animate-spin' : ''}`} />
-                  {refreshing.orders ? 'Refreshing...' : 'Refresh'}
-                </Button>
+                <>
+                  <Link href="/admin/orders">
+                    <Button variant="outline" className="border-gray-300 hover:bg-gray-50">
+                      View Full Page
+                    </Button>
+                  </Link>
+                  <Button 
+                    onClick={refreshOrders} 
+                    variant="outline" 
+                    className="border-gray-300 hover:bg-gray-50"
+                    disabled={refreshing.orders}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${refreshing.orders ? 'animate-spin' : ''}`} />
+                    {refreshing.orders ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                </>
               )}
               {activeTab === 'emails' && (
                 <Button 
@@ -1891,7 +1939,16 @@ export default function AdminPage() {
                 </h2>
               </div>
 
-              {loading ? (
+              {ordersError ? (
+                <div className="p-8 text-center">
+                  <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                  <p className="text-red-600 mb-4">{ordersError}</p>
+                  <Button onClick={loadOrders} className="bg-[#D4AF37] hover:bg-[#B8941F] text-black">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              ) : loading ? (
                 <div className="p-8 text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#D4AF37] mx-auto mb-4"></div>
                   <p className="text-gray-600">Loading orders...</p>
