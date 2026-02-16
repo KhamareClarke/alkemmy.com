@@ -71,8 +71,8 @@ export async function GET() {
       return NextResponse.json({ orders: [] });
     }
 
-    const addressIds = [...new Set(orders.map((o: any) => o.shipping_address_id).filter(Boolean))];
-    const userIds = [...new Set(orders.map((o: any) => o.user_id).filter(Boolean))];
+    const addressIds = Array.from(new Set(orders.map((o: any) => o.shipping_address_id).filter(Boolean)));
+    const userIds = Array.from(new Set(orders.map((o: any) => o.user_id).filter(Boolean)));
     const orderIds = orders.map((o: any) => o.id);
 
     // Parallel batch fetches - each query is fast
