@@ -46,7 +46,23 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
+  const [modalOrderLoading, setModalOrderLoading] = useState(false);
   const ordersLoadInProgress = useRef(false);
+
+  const fetchOrderDetails = async (orderId: string) => {
+    setModalOrderLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders?orderId=${encodeURIComponent(orderId)}`);
+      const data = await res.json();
+      if (res.ok && data.order) {
+        setSelectedOrder(data.order);
+      }
+    } catch (e) {
+      console.error('Failed to load order details', e);
+    } finally {
+      setModalOrderLoading(false);
+    }
+  };
 
   useEffect(() => {
     const authStatus = localStorage.getItem('admin_authenticated');
@@ -337,7 +353,14 @@ export default function AdminOrdersPage() {
                           return (
                             <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                               <td className="py-3">
-                                <button onClick={() => { setSelectedOrder(order); setShowOrderModal(true); }} className="text-sm font-medium text-[#D4AF37] hover:text-[#B8941F] hover:underline">
+                                <button
+                                  onClick={() => {
+                                    setSelectedOrder(order);
+                                    setShowOrderModal(true);
+                                    fetchOrderDetails(order.id);
+                                  }}
+                                  className="text-sm font-medium text-[#D4AF37] hover:text-[#B8941F] hover:underline"
+                                >
                                   #{order.order_number}
                                 </button>
                               </td>
@@ -399,6 +422,12 @@ export default function AdminOrdersPage() {
                   <X className="w-6 h-6" />
                 </button>
               </div>
+              {modalOrderLoading ? (
+                <div className="py-12 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#D4AF37] mx-auto mb-2"></div>
+                  <p className="text-gray-600 text-sm">Loading order details...</p>
+                </div>
+              ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
@@ -472,6 +501,7 @@ export default function AdminOrdersPage() {
                   <option value="cancelled">Cancelled</option>
                 </select>
               </div>
+              )}
             </div>
           </div>
         </div>

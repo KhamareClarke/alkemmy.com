@@ -9,9 +9,9 @@ async function sendStatusUpdateEmailAsync(currentOrder: any, status: string, pre
     console.log('Order:', currentOrder.order_number);
     console.log('Status change:', previousStatus, '->', status);
     
-    // Get customer email from shipping address or user profile
-    const customerEmail = currentOrder.shipping_address.email || 
-                         (userProfile && userProfile.email) || 
+    // Get customer email: prefer shipping address, then registered user profile
+    const customerEmail = (currentOrder.shipping_address && currentOrder.shipping_address.email) ||
+                         (userProfile && userProfile.email) ||
                          null;
     console.log('Customer email:', customerEmail);
 
@@ -20,9 +20,14 @@ async function sendStatusUpdateEmailAsync(currentOrder: any, status: string, pre
       return;
     }
 
+    // Customer name: from shipping address or from registered user profile
+    const customerName = (currentOrder.shipping_address && currentOrder.shipping_address.first_name != null)
+      ? `${currentOrder.shipping_address.first_name || ''} ${currentOrder.shipping_address.last_name || ''}`.trim()
+      : (userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : 'Customer');
+
     const emailData = {
       orderNumber: currentOrder.order_number,
-      customerName: `${currentOrder.shipping_address.first_name} ${currentOrder.shipping_address.last_name}`,
+      customerName: customerName || 'Customer',
       customerEmail: customerEmail,
       newStatus: status,
       previousStatus: previousStatus,
@@ -52,9 +57,43 @@ async function sendStatusUpdateEmailAsync(currentOrder: any, status: string, pre
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Simple queries avoid statement timeout - no heavy joins
+    const { searchParams } = new URL(request.url);
+    const orderId = searchParams.get('orderId');
+
+    // Single order fetch (for modal) - always returns full order_items
+    if (orderId) {
+      const { data: order, error: orderError } = await adminSupabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+      if (orderError || !order) {
+        return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      }
+
+      const [addressRes, itemsRes, profileRes] = await Promise.all([
+        order.shipping_address_id
+          ? adminSupabase.from('addresses').select('*').eq('id', order.shipping_address_id).single()
+          : { data: null },
+        adminSupabase.from('order_items').select('*').eq('order_id', order.id),
+        order.user_id
+          ? adminSupabase.from('profiles').select('*').eq('id', order.user_id).single()
+          : { data: null }
+      ]);
+
+      const enriched = {
+        ...order,
+        shipping_address: addressRes.data ?? null,
+        order_items: itemsRes.data ?? [],
+        user: profileRes.data ?? null
+      };
+      return NextResponse.json({ order: enriched });
+    }
+
+    // List all orders
     const { data: ordersData, error: ordersError } = await adminSupabase
       .from('orders')
       .select('*')
@@ -75,18 +114,23 @@ export async function GET() {
     const userIds = Array.from(new Set(orders.map((o: any) => o.user_id).filter(Boolean)));
     const orderIds = orders.map((o: any) => o.id);
 
-    // Parallel batch fetches - each query is fast
-    const [addressesRes, orderItemsRes, profilesRes] = await Promise.all([
+    // Fetch order_items in chunks to avoid URL/query limits (e.g. 100 order IDs per request)
+    const chunkSize = 100;
+    const orderItemsByOrder: Record<string, any[]> = {};
+    for (let i = 0; i < orderIds.length; i += chunkSize) {
+      const chunk = orderIds.slice(i, i + chunkSize);
+      const { data: items } = await adminSupabase.from('order_items').select('*').in('order_id', chunk);
+      (items || []).forEach((item: any) => {
+        (orderItemsByOrder[item.order_id] ??= []).push(item);
+      });
+    }
+
+    const [addressesRes, profilesRes] = await Promise.all([
       addressIds.length > 0 ? adminSupabase.from('addresses').select('*').in('id', addressIds) : { data: [] },
-      adminSupabase.from('order_items').select('*').in('order_id', orderIds),
       userIds.length > 0 ? adminSupabase.from('profiles').select('*').in('id', userIds) : { data: [] }
     ]);
 
     const addressesMap = new Map((addressesRes.data || []).map((a: any) => [a.id, a]));
-    const orderItemsByOrder = (orderItemsRes.data || []).reduce((acc: Record<string, any[]>, item: any) => {
-      (acc[item.order_id] ??= []).push(item);
-      return acc;
-    }, {});
     const profilesMap = new Map((profilesRes.data || []).map((p: any) => [p.id, p]));
 
     const enrichedOrders = orders.map((order: any) => ({
@@ -174,9 +218,10 @@ export async function PATCH(request: NextRequest) {
     
     console.log('✅ Order status updated successfully');
 
-    // Send status update email asynchronously (don't wait for it)
-    if (previousStatus !== status && currentOrder.shipping_address) {
-      // Don't await this - let it run in the background
+    // Send status update email when we have a way to reach the customer (registered or guest with address email)
+    const canSendEmail = (currentOrder.shipping_address && currentOrder.shipping_address.email) ||
+                        (userProfile && userProfile.email);
+    if (previousStatus !== status && canSendEmail) {
       sendStatusUpdateEmailAsync(currentOrder, status, previousStatus, userProfile).catch(error => {
         console.error('❌ Background email sending failed:', error);
       });
