@@ -62,23 +62,17 @@ function ThankYouPageContent() {
 
   const findOrderBySessionId = async (sessionId: string) => {
     try {
-      // Call API to find order by session ID (use short parameter to avoid URL length issues)
-      const response = await fetch(`/api/get-order-by-session?sid=${sessionId}`);
+      const response = await fetch(`/api/get-order-by-session?sid=${encodeURIComponent(sessionId)}`);
       if (response.ok) {
         const data = await response.json();
         if (data.order) {
           setOrder(data.order as OrderDetails);
-        } else {
-          // Order might still be processing via webhook, show success message
-          setLoading(false);
         }
-      } else {
-        // Order might still be processing via webhook, show success message
-        setLoading(false);
       }
+      // Always stop loading (show order details or generic success)
+      setLoading(false);
     } catch (err) {
       console.error('Error finding order by session:', err);
-      // Order might still be processing via webhook, show success message
       setLoading(false);
     }
   };
