@@ -55,53 +55,20 @@ export async function POST(request: NextRequest) {
       } : null
     });
 
-    // Create line items for Stripe
-    // For large carts, minimize data to avoid URL length issues
-    const isLargeCart = cartItems.length > 5;
+    // Create line items for Stripe - keep minimal to avoid "URL must be 2048 characters or less"
     const lineItems = cartItems.map((item: any) => {
-      // Truncate product name aggressively - 50 chars max for large carts, 80 for small
-      const maxNameLength = isLargeCart ? 50 : 80;
-      const productName = (item.name || 'Product').substring(0, maxNameLength);
-      
-      const productData: any = {
-        name: productName,
-      };
-      
-      // Only include description for small carts and truncate to 100 chars
-      if (!isLargeCart && item.description && item.description.trim() !== '') {
-        productData.description = item.description.substring(0, 100);
-      }
-      
-      // Skip images for large carts to reduce URL length
-      // Only include images for small carts (3 or fewer items)
-      if (cartItems.length <= 3 && item.image && item.image.trim() !== '') {
-        // Convert relative URLs to absolute URLs if needed
-        let imageUrl = item.image.trim();
-        if (imageUrl.startsWith('/')) {
-          const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-          imageUrl = `${baseUrl}${imageUrl}`;
-        } else if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-          // If it's not a full URL, try to construct one
-          const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-          imageUrl = `${baseUrl}/${imageUrl}`;
-        }
-        // Only add if it's a valid URL
-        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-          productData.images = [imageUrl];
-        }
-      }
-      
-      // Validate price
+      const productName = (item.name || 'Product').substring(0, 22);
       const price = parseFloat(item.price);
       if (isNaN(price) || price <= 0) {
         throw new Error(`Invalid price for item: ${item.name}`);
       }
-      
       return {
         price_data: {
           currency: 'gbp',
-          product_data: productData,
-          unit_amount: Math.round(price * 100), // Convert to pence
+          product_data: {
+            name: productName,
+          },
+          unit_amount: Math.round(price * 100),
         },
         quantity: item.quantity || 1,
       };
