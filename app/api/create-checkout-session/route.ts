@@ -170,6 +170,22 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create temporary order');
     }
 
+    // Insert order_items for the temp order so admin/customer see items even before webhook runs
+    const orderItemsData = cartItems.map((item: any) => ({
+      order_id: tempOrder.id,
+      product_id: String(item.id),
+      product_name: item.name || 'Product',
+      product_image: item.image || null,
+      quantity: item.quantity || 1,
+      price: parseFloat(item.price) || 0,
+    }));
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItemsData);
+    if (itemsError) {
+      console.warn('Could not insert temp order items:', itemsError);
+    }
+
     // Store order data in separate checkout_sessions table to avoid URL length issues
     // This keeps the notes field small and prevents URL length errors
     try {
