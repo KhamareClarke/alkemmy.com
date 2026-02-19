@@ -428,79 +428,81 @@ export default function AdminOrdersPage() {
                   <p className="text-gray-600 text-sm">Loading order details...</p>
                 </div>
               ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-gray-900 mb-3">Order Info</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-gray-600">Date:</span><span>{new Date(selectedOrder.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Total:</span><span className="font-bold">£{selectedOrder.total_amount.toFixed(2)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Payment:</span><span>{selectedOrder.payment_method === 'stripe' ? 'Card' : 'Cash on Delivery'}</span></div>
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-900 mb-3">Order Info</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between"><span className="text-gray-600">Date:</span><span>{new Date(selectedOrder.created_at).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Total:</span><span className="font-bold">£{selectedOrder.total_amount.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Payment:</span><span>{selectedOrder.payment_method === 'stripe' ? 'Card' : 'Cash on Delivery'}</span></div>
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-900 mb-3">Customer</h3>
+                      {selectedOrder.user ? (
+                        <div className="text-sm">
+                          <p className="font-medium">{selectedOrder.user.first_name} {selectedOrder.user.last_name}</p>
+                          <p className="text-gray-600">{selectedOrder.user.email}</p>
+                        </div>
+                      ) : selectedOrder.shipping_address ? (
+                        <div className="text-sm">
+                          <p className="font-medium">{selectedOrder.shipping_address.first_name} {selectedOrder.shipping_address.last_name}</p>
+                          {selectedOrder.shipping_address.email && <p className="text-gray-600">{selectedOrder.shipping_address.email}</p>}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">Guest</p>
+                      )}
                     </div>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-gray-900 mb-3">Customer</h3>
-                    {selectedOrder.user ? (
-                      <div className="text-sm">
-                        <p className="font-medium">{selectedOrder.user.first_name} {selectedOrder.user.last_name}</p>
-                        <p className="text-gray-600">{selectedOrder.user.email}</p>
-                      </div>
-                    ) : selectedOrder.shipping_address ? (
-                      <div className="text-sm">
-                        <p className="font-medium">{selectedOrder.shipping_address.first_name} {selectedOrder.shipping_address.last_name}</p>
-                        {selectedOrder.shipping_address.email && <p className="text-gray-600">{selectedOrder.shipping_address.email}</p>}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-sm">Guest</p>
-                    )}
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-900 mb-3">Shipping</h3>
+                      {selectedOrder.shipping_address ? (
+                        <div className="text-sm">
+                          <p>{selectedOrder.shipping_address.address_line_1}</p>
+                          {selectedOrder.shipping_address.address_line_2 && <p>{selectedOrder.shipping_address.address_line_2}</p>}
+                          <p>{selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.postal_code}</p>
+                          <p>{selectedOrder.shipping_address.country}</p>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No address</p>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="font-semibold text-gray-900 mb-3">Items</h3>
+                      {selectedOrder.order_items?.length ? (
+                        <div className="space-y-2">
+                          {selectedOrder.order_items.map((item: any) => (
+                            <div key={item.id} className="flex justify-between text-sm">
+                              <span>{item.product_name} × {item.quantity}</span>
+                              <span>£{(item.quantity * item.price).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-sm">No items</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-gray-900 mb-3">Shipping</h3>
-                    {selectedOrder.shipping_address ? (
-                      <div className="text-sm">
-                        <p>{selectedOrder.shipping_address.address_line_1}</p>
-                        {selectedOrder.shipping_address.address_line_2 && <p>{selectedOrder.shipping_address.address_line_2}</p>}
-                        <p>{selectedOrder.shipping_address.city}, {selectedOrder.shipping_address.postal_code}</p>
-                        <p>{selectedOrder.shipping_address.country}</p>
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-sm">No address</p>
-                    )}
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold text-gray-900 mb-3">Items</h3>
-                    {selectedOrder.order_items?.length ? (
-                      <div className="space-y-2">
-                        {selectedOrder.order_items.map((item: any) => (
-                          <div key={item.id} className="flex justify-between text-sm">
-                            <span>{item.product_name} × {item.quantity}</span>
-                            <span>£{(item.quantity * item.price).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-sm">No items</p>
-                    )}
-                  </div>
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="font-semibold text-gray-900 mb-3">Update Status</h3>
+                  <select
+                    value={selectedOrder.status}
+                    onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
+                    disabled={updatingOrder === selectedOrder.id}
+                    className="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-[#D4AF37] disabled:opacity-50"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
                 </div>
-              </div>
-              <div className="mt-6 pt-6 border-t">
-                <h3 className="font-semibold text-gray-900 mb-3">Update Status</h3>
-                <select
-                  value={selectedOrder.status}
-                  onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
-                  disabled={updatingOrder === selectedOrder.id}
-                  className="border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-[#D4AF37] disabled:opacity-50"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="processing">Processing</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
+              </>
               )}
             </div>
           </div>
