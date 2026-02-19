@@ -218,13 +218,16 @@ export async function PATCH(request: NextRequest) {
     
     console.log('✅ Order status updated successfully');
 
-    // Send status update email when we have a way to reach the customer (registered or guest with address email)
+    // Send status update email immediately (await so it completes before response - ensures delivery on serverless)
     const canSendEmail = (currentOrder.shipping_address && currentOrder.shipping_address.email) ||
                         (userProfile && userProfile.email);
     if (previousStatus !== status && canSendEmail) {
-      sendStatusUpdateEmailAsync(currentOrder, status, previousStatus, userProfile).catch(error => {
-        console.error('❌ Background email sending failed:', error);
-      });
+      try {
+        await sendStatusUpdateEmailAsync(currentOrder, status, previousStatus, userProfile);
+      } catch (emailErr: any) {
+        console.error('❌ Status update email failed:', emailErr);
+        // Don't fail the status update - email is best-effort
+      }
     }
 
     return NextResponse.json({ success: true });
