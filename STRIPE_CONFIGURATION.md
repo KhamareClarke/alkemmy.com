@@ -124,6 +124,13 @@ This allows efficient order lookup by payment intent ID.
 - **Vercel env vars:** In the Vercel project for alkhemmy.com, set **Environment variables** for Production: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and any Supabase/email vars the webhook uses. Without `STRIPE_WEBHOOK_SECRET`, the route may return 500 instead of 200.
 - **New endpoint = new secret:** If you add a new webhook endpoint in Stripe, copy the new **Signing secret** (starts with `whsec_`) and set it as `STRIPE_WEBHOOK_SECRET` in Vercel, then redeploy.
 
+### Checkout cancel/success redirect 404 (DEPLOYMENT_NOT_FOUND)
+
+- Stripe redirects to the **cancel** or **success** URL after payment. If that URL is `https://alkhemmy-com.vercel.app/...`, it can 404 because that deployment may not exist.
+- **Fix:** In Vercel → your project → Settings → Environment Variables, add for **Production**:
+  - **`NEXT_PUBLIC_SITE_URL`** = **`https://alkhemmy.com`**
+- The app uses this for Stripe `success_url` and `cancel_url`, so redirects always go to your live site. Redeploy after adding the variable.
+
 ### If Stripe payment form doesn't appear:
 1. Check that `.env.local` exists and has the correct keys
 2. Restart your development server

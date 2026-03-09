@@ -46,7 +46,8 @@ function CheckoutPageContent() {
       setError(null); // Clear any previous errors
       
       try {
-        const baseUrl = window.location.origin;
+        // Server uses NEXT_PUBLIC_SITE_URL for Stripe redirect URLs; client still sends for reference
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
         console.log('Creating Stripe Checkout session...');
         
         const response = await fetch('/api/create-checkout-session', {

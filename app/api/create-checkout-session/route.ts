@@ -209,8 +209,12 @@ export async function POST(request: NextRequest) {
         .eq('id', tempOrder.id);
     }
 
-    // Ensure URLs are not too long - use short session_id only
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    // Use canonical site URL so Stripe success/cancel redirects always hit a working deployment.
+    // Set NEXT_PUBLIC_SITE_URL=https://alkhemmy.com in Vercel production so redirects never use broken vercel.app URLs.
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+      'http://localhost:3000';
     const shortSuccessUrl = `${baseUrl}/thank-you?sid={CHECKOUT_SESSION_ID}`;
     const shortCancelUrl = `${baseUrl}/checkout?canceled=1`;
 
