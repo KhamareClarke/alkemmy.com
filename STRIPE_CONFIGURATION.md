@@ -65,9 +65,10 @@ Stripe webhooks are now fully configured to handle checkout completion events au
 
 #### Setting Up Webhooks in Stripe Dashboard:
 
-1. **Go to Stripe Dashboard** → Developers → Webhooks
-2. **Click "Add endpoint"**
-3. **Enter your webhook URL**: `https://yourdomain.com/api/webhooks/stripe`
+1. **Go to Stripe Dashboard** → [Developers → Webhooks](https://dashboard.stripe.com/webhooks)
+2. **Click "Add endpoint"** (or update the existing failing endpoint)
+3. **Use your live domain** — enter: `https://alkhemmy.com/api/webhooks/stripe`  
+   - Do **not** use `https://alkhemmy-com.vercel.app/...`; use your canonical live URL so the same deployment is always used.
 4. **Select events to listen for**:
    - `payment_intent.succeeded`
    - `payment_intent.payment_failed`
@@ -115,6 +116,13 @@ This allows efficient order lookup by payment intent ID.
 - [ ] Test payment completed (you need to do this)
 
 ## 🆘 Troubleshooting
+
+### Stripe says "webhook delivery issues" or "404" (URL doesn't exist)
+
+- **Use your live domain in Stripe:** In [Stripe → Developers → Webhooks](https://dashboard.stripe.com/webhooks), set the endpoint URL to **`https://alkhemmy.com/api/webhooks/stripe`**, not `https://alkhemmy-com.vercel.app/...`. The vercel.app URL can 404 if it’s not the same deployment as your production domain.
+- **Check the endpoint:** Open `https://alkhemmy.com/api/webhooks/stripe` in a browser. You should see a JSON response like `{"ok":true,"endpoint":"stripe-webhook",...}`. If you get 404, the route isn’t deployed (redeploy on Vercel and ensure the project linked to alkhemmy.com includes this app).
+- **Vercel env vars:** In the Vercel project for alkhemmy.com, set **Environment variables** for Production: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and any Supabase/email vars the webhook uses. Without `STRIPE_WEBHOOK_SECRET`, the route may return 500 instead of 200.
+- **New endpoint = new secret:** If you add a new webhook endpoint in Stripe, copy the new **Signing secret** (starts with `whsec_`) and set it as `STRIPE_WEBHOOK_SECRET` in Vercel, then redeploy.
 
 ### If Stripe payment form doesn't appear:
 1. Check that `.env.local` exists and has the correct keys

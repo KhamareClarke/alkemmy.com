@@ -3,11 +3,22 @@ import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
 import { sendOrderConfirmationEmail, sendAdminNotificationEmail } from '@/lib/email-service';
 
+// Ensure this route is always dynamic (no static optimization) so Stripe can reach it
+export const dynamic = 'force-dynamic';
+
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-02-24.acacia',
 }) : null;
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+/** GET: allow Stripe or you to verify the endpoint URL exists (returns 200). */
+export async function GET() {
+  return NextResponse.json(
+    { ok: true, endpoint: 'stripe-webhook', message: 'Use POST with Stripe webhook events.' },
+    { status: 200 }
+  );
+}
 
 export async function POST(request: NextRequest) {
   if (!stripe || !webhookSecret) {
