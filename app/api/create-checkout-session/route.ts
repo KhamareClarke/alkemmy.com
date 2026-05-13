@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
 import { resolveCheckoutDiscount } from '@/lib/discounts/resolve-checkout-discount';
-import type { OrderDiscountMeta } from '@/lib/order-api';
+import type { OrderDiscountMeta } from '@/lib/order-types';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-02-24.acacia',

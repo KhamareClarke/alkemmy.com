@@ -6,7 +6,7 @@ import { sendSmsSafe } from '@/lib/sms/send';
 import { buildSmsBody } from '@/lib/sms/templates';
 import { adminSupabase } from '@/lib/admin-supabase';
 import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
-import type { OrderDiscountMeta } from '@/lib/order-api';
+import type { OrderDiscountMeta } from '@/lib/order-types';
 
 // Ensure this route is always dynamic (no static optimization) so Stripe can reach it
 export const dynamic = 'force-dynamic';

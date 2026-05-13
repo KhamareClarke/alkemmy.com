@@ -10,7 +10,7 @@ import { trackClientEvent } from '@/lib/analytics/client-track';
 import { ANALYTICS_EVENTS } from '@/lib/analytics/types';
 import CheckoutForm from '@/components/checkout/CheckoutForm';
 import OrderSummary from '@/components/checkout/OrderSummary';
-import { OrderData } from '@/lib/order-api';
+import type { OrderData } from '@/lib/order-types';
 import type { AppliedDiscountState } from '@/components/checkout/DiscountCodeInput';
 import { Home, CheckCircle } from 'lucide-react';
 import Link from 'next/link';

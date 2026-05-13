@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createOrder, updateOrderPaymentStatus, type OrderDiscountMeta } from '@/lib/order-api';
+import { createOrder, updateOrderPaymentStatus } from '@/lib/order-api';
+import type { OrderDiscountMeta } from '@/lib/order-types';
 import { sendOrderConfirmationEmail, sendAdminNotificationEmail } from '@/lib/email-service';
 import { sendSmsSafe } from '@/lib/sms/send';
 import { buildSmsBody } from '@/lib/sms/templates';

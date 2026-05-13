@@ -1,76 +1,16 @@
 import { supabase } from './supabase';
-import { CartItem } from './cart-context';
+import type { CartItem } from './cart-context';
+import type { Order, OrderData, OrderItem, OrderDiscountMeta } from './order-types';
 
-export interface OrderData {
-  shippingAddress: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    addressLine1: string;
-    addressLine2?: string;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-  };
-  billingAddress?: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    addressLine1: string;
-    addressLine2?: string;
-    city: string;
-    state: string;
-    postalCode: string;
-    country: string;
-  };
-  billingSameAsShipping: boolean;
-  paymentMethod: 'stripe' | 'paypal' | 'cash_on_delivery';
-  saveAddress?: boolean;
-}
+export type { Order, OrderData, OrderItem, OrderDiscountMeta } from './order-types';
+export { getOrderById, getOrdersByUserId } from './order-queries';
 
-export interface Order {
-  id: string;
-  order_number: string;
-  user_id: string;
-  status: string;
-  total_amount: number;
-  shipping_address_id: string;
-  billing_address_id?: string;
-  payment_method: string;
-  payment_status: string;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface OrderItem {
-  id: string;
-  order_id: string;
-  product_id: string;
-  product_name: string;
-  product_image?: string;
-  quantity: number;
-  price: number;
-  created_at: string;
-}
-
-// Generate unique order number
 function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substr(2, 5);
   return `ALK-${timestamp}-${random}`.toUpperCase();
 }
 
-export interface OrderDiscountMeta {
-  discountCodeId: string
-  discountCode: string
-  discountAmount: number
-}
-
-// Create order in database
 export async function createOrder(
   orderData: OrderData,
   cartItems: CartItem[],
@@ -80,11 +20,10 @@ export async function createOrder(
 ): Promise<{ order: Order; orderItems: OrderItem[] }> {
   try {
     const orderNumber = generateOrderNumber();
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const shipping = subtotal > 50 ? 0 : 4.99;
     const finalTotal = subtotal + shipping;
 
-    // Create shipping address
     const { data: shippingAddress, error: shippingError } = await supabase
       .from('addresses')
       .insert({
@@ -107,7 +46,6 @@ export async function createOrder(
 
     if (shippingError) throw shippingError;
 
-    // Create billing address if different from shipping
     let billingAddressId = shippingAddress.id;
     if (!orderData.billingSameAsShipping && orderData.billingAddress) {
       const { data: billingAddress, error: billingError } = await supabase
@@ -134,16 +72,16 @@ export async function createOrder(
       billingAddressId = billingAddress.id;
     }
 
-    // Create order
-    const orderNotes = orderData.paymentMethod === 'cash_on_delivery' 
-      ? 'Cash on delivery order' 
-      : orderData.paymentMethod === 'paypal' 
-        ? 'PayPal payment order' 
-        : paymentIntentId 
-          ? `Stripe payment order - Payment Intent ID: ${paymentIntentId}`
-          : 'Stripe payment order';
+    const orderNotes =
+      orderData.paymentMethod === 'cash_on_delivery'
+        ? 'Cash on delivery order'
+        : orderData.paymentMethod === 'paypal'
+          ? 'PayPal payment order'
+          : paymentIntentId
+            ? `Stripe payment order - Payment Intent ID: ${paymentIntentId}`
+            : 'Stripe payment order';
 
-    const orderDataToInsert: any = {
+    const orderDataToInsert: Record<string, unknown> = {
       user_id: userId || null,
       order_number: orderNumber,
       status: 'pending',
@@ -161,12 +99,17 @@ export async function createOrder(
       orderDataToInsert.discount_amount = discount.discountAmount;
     }
 
-    // Add payment_intent_id if provided and column exists
     if (paymentIntentId) {
       try {
         orderDataToInsert.payment_intent_id = paymentIntentId;
-      } catch (e) {
-        // Column might not exist, that's okay - it's in notes
+      } catch {
+        const { data: order } = await supabase.from('orders').select('notes').eq('id', shippingAddress.id).single();
+        if (order) {
+          const existingNotes = order.notes || '';
+          orderDataToInsert.notes = existingNotes
+            ? `${existingNotes}\nPayment Intent ID: ${paymentIntentId}`
+            : `Payment Intent ID: ${paymentIntentId}`;
+        }
       }
     }
 
@@ -178,8 +121,7 @@ export async function createOrder(
 
     if (orderError) throw orderError;
 
-    // Create order items
-    const orderItemsData = cartItems.map(item => {
+    const orderItemsData = cartItems.map((item) => {
       const base: Record<string, unknown> = {
         order_id: order.id,
         product_id: String(item.id).split('::')[0],
@@ -195,10 +137,7 @@ export async function createOrder(
       return base;
     });
 
-    const { data: orderItems, error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItemsData)
-      .select();
+    const { data: orderItems, error: itemsError } = await supabase.from('order_items').insert(orderItemsData).select();
 
     if (itemsError) throw itemsError;
 
@@ -229,45 +168,34 @@ export async function createOrder(
   }
 }
 
-// Update order payment status
 export async function updateOrderPaymentStatus(
   orderId: string,
   paymentStatus: 'paid' | 'failed' | 'refunded',
   paymentIntentId?: string
 ): Promise<void> {
   try {
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       payment_status: paymentStatus,
       status: paymentStatus === 'paid' ? 'processing' : 'pending',
       updated_at: new Date().toISOString(),
     };
 
-    // Store payment_intent_id if provided (column may or may not exist)
     if (paymentIntentId) {
-      // Try to update payment_intent_id column if it exists
       try {
         updateData.payment_intent_id = paymentIntentId;
-      } catch (e) {
-        // If column doesn't exist, store in notes
-        const { data: order } = await supabase
-          .from('orders')
-          .select('notes')
-          .eq('id', orderId)
-          .single();
-        
+      } catch {
+        const { data: order } = await supabase.from('orders').select('notes').eq('id', orderId).single();
+
         if (order) {
-          const existingNotes = order.notes || '';
-          updateData.notes = existingNotes 
+          const existingNotes = (order as { notes?: string }).notes || '';
+          updateData.notes = existingNotes
             ? `${existingNotes}\nPayment Intent ID: ${paymentIntentId}`
             : `Payment Intent ID: ${paymentIntentId}`;
         }
       }
     }
 
-    const { error } = await supabase
-      .from('orders')
-      .update(updateData)
-      .eq('id', orderId);
+    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId);
 
     if (error) throw error;
 
@@ -294,48 +222,3 @@ export async function updateOrderPaymentStatus(
     throw new Error('Failed to update order payment status');
   }
 }
-
-// Get order by ID
-export async function getOrderById(orderId: string): Promise<Order | null> {
-  try {
-    const { data: order, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        shipping_address:addresses!shipping_address_id(*),
-        billing_address:addresses!billing_address_id(*),
-        order_items(*)
-      `)
-      .eq('id', orderId)
-      .single();
-
-    if (error) throw error;
-    return order;
-  } catch (error) {
-    console.error('Error fetching order:', error);
-    return null;
-  }
-}
-
-// Get orders by user ID
-export async function getOrdersByUserId(userId: string): Promise<Order[]> {
-  try {
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        shipping_address:addresses!shipping_address_id(*),
-        billing_address:addresses!billing_address_id(*),
-        order_items(*)
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return orders || [];
-  } catch (error) {
-    console.error('Error fetching user orders:', error);
-    return [];
-  }
-}
-

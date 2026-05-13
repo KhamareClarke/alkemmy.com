@@ -1,6 +1,6 @@
 import 'server-only';
 import type { User } from '@supabase/supabase-js';
-import type { Order } from '@/lib/order-api';
+import type { Order } from '@/lib/order-types';
 
 export interface HubSpotUserPayload {
   id: string;

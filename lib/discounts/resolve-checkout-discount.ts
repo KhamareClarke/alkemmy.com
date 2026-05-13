@@ -1,6 +1,6 @@
 import { adminSupabase } from '@/lib/admin-supabase';
 import type { CartItem } from '@/lib/cart-context';
-import type { OrderDiscountMeta } from '@/lib/order-api';
+import type { OrderDiscountMeta } from '@/lib/order-types';
 import { applyDiscountToCartLines } from './apply-discount';
 import type { CartLineForDiscount } from './types';
 import { validateDiscountCodeRow } from './validate-code';
