@@ -500,7 +500,7 @@ const SkinMatcherQuiz = () => {
               Your Perfect Skincare Match
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-              Based on your skin profile, we've curated these personalized recommendations just for you.
+              Based on your skin profile, we&apos;ve curated these personalized recommendations just for you.
             </p>
             
             {/* Analysis Summary */}

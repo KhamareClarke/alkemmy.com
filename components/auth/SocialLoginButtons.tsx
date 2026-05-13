@@ -48,10 +48,6 @@ export default function SocialLoginButtons() {
         </button>
       </div>
       {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-      <p className="text-xs text-gray-500 text-center">
-        Enable Google and Facebook providers in Supabase Auth, and add this redirect URL:{' '}
-        <span className="font-mono">/auth/callback</span>
-      </p>
     </div>
   );
 }

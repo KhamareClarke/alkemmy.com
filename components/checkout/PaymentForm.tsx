@@ -133,7 +133,7 @@ export default function PaymentForm({
         <CardContent className="pt-6">
           <div className="text-sm text-gray-600 space-y-2">
             <p><strong>Security:</strong> All payments are processed securely using industry-standard encryption.</p>
-            <p><strong>Refunds:</strong> If you're not satisfied, we offer a 30-day money-back guarantee.</p>
+            <p><strong>Refunds:</strong> If you&apos;re not satisfied, we offer a 30-day money-back guarantee.</p>
             <p><strong>Support:</strong> Need help? Contact us at support@alkemmy.com</p>
           </div>
         </CardContent>

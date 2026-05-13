@@ -45,7 +45,7 @@ export default function WhatsAppWidget({
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Chat with us</h3>
-                  <p className="text-xs text-gray-500">We'll reply as soon as possible</p>
+                  <p className="text-xs text-gray-500">We&apos;ll reply as soon as possible</p>
                 </div>
               </div>
               <button

@@ -851,7 +851,7 @@ export default function AdminPage() {
     }
   };
 
-  const useTemplate = (template: any) => {
+  const applyEmailTemplate = (template: any) => {
     setEmailComposer(prev => ({
       ...prev,
       subject: template.subject,
@@ -2154,7 +2154,7 @@ export default function AdminPage() {
                       <h4 className="font-medium text-gray-900 mb-2">{template.name}</h4>
                       <p className="text-sm text-gray-600 mb-3 line-clamp-2">{template.subject}</p>
                       <Button
-                        onClick={() => useTemplate(template)}
+                        onClick={() => applyEmailTemplate(template)}
                         variant="outline"
                         size="sm"
                         className="w-full"
