@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sendNotificationEmail } from '@/lib/email/send-notification';
+import { recordAnalyticsEvent } from '@/lib/analytics/server-events';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,8 +47,21 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // TODO: Integrate with marketing platform (Mailchimp, SendGrid, etc.)
-    // Example: await addToMailchimp(email, name);
+    const normalized = email.toLowerCase().trim();
+    const first =
+      typeof name === 'string' && name.trim()
+        ? name.trim().split(/\s+/)[0] ?? ''
+        : '';
+    void sendNotificationEmail('newsletter_signup_confirmation', {
+      to: normalized,
+      firstName: first,
+    }).catch((e) => console.error('newsletter confirmation email:', e));
+
+    void recordAnalyticsEvent({
+      eventName: ANALYTICS_EVENTS.NEWSLETTER_SIGNUP,
+      eventCategory: 'marketing',
+      eventProperties: { email_domain: normalized.split('@')[1] },
+    });
 
     return NextResponse.json({
       success: true,

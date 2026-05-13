@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
 import { sendOrderConfirmationEmail, sendAdminNotificationEmail } from '@/lib/email-service';
+import { sendSmsSafe } from '@/lib/sms/send';
+import { buildSmsBody } from '@/lib/sms/templates';
+import { adminSupabase } from '@/lib/admin-supabase';
+import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
+import type { OrderDiscountMeta } from '@/lib/order-api';
 
 // Ensure this route is always dynamic (no static optimization) so Stripe can reach it
 export const dynamic = 'force-dynamic';
@@ -207,6 +212,15 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       console.error('Error sending confirmation emails:', emailError);
       // Don't throw - email failure shouldn't fail the webhook
     }
+
+    const phone = shippingAddress.phone;
+    if (phone && String(phone).trim()) {
+      sendSmsSafe({
+        to: String(phone).trim(),
+        type: 'order_confirmation',
+        body: buildSmsBody('order_confirmation', { orderNumber: order.order_number }),
+      });
+    }
   }
 }
 
@@ -253,6 +267,25 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   }
 
   console.log(`Order ${order.order_number} marked as payment failed`);
+
+  if (order.shipping_address_id) {
+    const { data: addr } = await supabase
+      .from('addresses')
+      .select('phone')
+      .eq('id', order.shipping_address_id)
+      .single();
+    const phone = addr?.phone;
+    if (phone && String(phone).trim()) {
+      sendSmsSafe({
+        to: String(phone).trim(),
+        type: 'payment_failed',
+        body: buildSmsBody('payment_failed', {
+          orderNumber: order.order_number,
+          amount: order.total_amount != null ? `£${Number(order.total_amount).toFixed(2)}` : undefined,
+        }),
+      });
+    }
+  }
 }
 
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
@@ -289,10 +322,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       .eq('temp_order_id', tempOrderId)
       .single();
 
+    let discountMeta: OrderDiscountMeta | null = null;
     if (checkoutSession) {
-      // Use data from checkout_sessions table
       orderData = checkoutSession.order_data;
       cartItems = checkoutSession.cart_items;
+      if (checkoutSession.discount) {
+        discountMeta = checkoutSession.discount as any;
+      }
     } else {
       // Fall back to parsing from notes (compact format)
       const orderNotes = JSON.parse(tempOrder.notes || '{}');
@@ -300,8 +336,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       // Reconstruct order data from compact format
       // Support both old format (email) and new ultra-compact format (e)
       const hasEmail = orderNotes.email || orderNotes.e;
-      
+
       if (hasEmail) {
+        if (orderNotes.d) {
+          discountMeta = orderNotes.d as any;
+        }
         // Compact format - reconstruct full order data
         const { data: tempAddress } = await supabase
           .from('addresses')
@@ -396,7 +435,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     const { createOrder } = await import('@/lib/order-api');
 
     // Create the actual order (this will create addresses and order items)
-    const { order, orderItems } = await createOrder(orderData, cartItems, userId);
+    const { order, orderItems } = await createOrder(orderData, cartItems, userId, undefined, discountMeta);
+
+    if (discountMeta?.discountCodeId) {
+      await incrementDiscountCodeUsage(adminSupabase, discountMeta.discountCodeId);
+    }
 
     // Get payment intent ID if available
     let paymentIntentId: string | undefined;
@@ -490,6 +533,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       } catch (emailError) {
         console.error('Error sending confirmation emails:', emailError);
         // Don't throw - email failure shouldn't fail the webhook
+      }
+
+      const phone = shippingAddress.phone;
+      if (phone && String(phone).trim()) {
+        sendSmsSafe({
+          to: String(phone).trim(),
+          type: 'order_confirmation',
+          body: buildSmsBody('order_confirmation', { orderNumber: order.order_number }),
+        });
       }
     }
 

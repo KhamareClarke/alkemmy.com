@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
+import { useInAppNotifications } from '@/lib/notifications/in-app-context';
+import { trackClientEvent } from '@/lib/analytics/client-track';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/types';
 import CheckoutForm from '@/components/checkout/CheckoutForm';
 import OrderSummary from '@/components/checkout/OrderSummary';
 import { OrderData } from '@/lib/order-api';
+import type { AppliedDiscountState } from '@/components/checkout/DiscountCodeInput';
 import { Home, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -16,19 +20,26 @@ function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const { state: cartState, dispatch } = useCart();
   const { user } = useAuth();
+  const { showPaymentAlert } = useInAppNotifications();
+  const paymentAlertShown = useRef(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'stripe' | 'cash_on_delivery'>('stripe');
   const [checkoutData, setCheckoutData] = useState<any>(null);
+  const [discount, setDiscount] = useState<AppliedDiscountState | null>(null);
 
   // Check if user was redirected from canceled Stripe Checkout
   useEffect(() => {
     const canceled = searchParams.get('canceled');
-    if (canceled === 'true') {
-      setError('Payment was canceled. You can try again or choose a different payment method.');
-    }
-  }, [searchParams]);
+    if (canceled !== 'true' || paymentAlertShown.current) return;
+    paymentAlertShown.current = true;
+    setError('Payment was canceled. You can try again or choose a different payment method.');
+    showPaymentAlert(
+      'Payment canceled',
+      'Your checkout session was closed before payment completed. You can try again or pick another payment method.'
+    );
+  }, [searchParams, showPaymentAlert]);
 
   const subtotal = cartState.totalPrice;
   const shipping = subtotal > 50 ? 0 : 4.99;
@@ -39,6 +50,22 @@ function CheckoutPageContent() {
     setError(null);
     setCheckoutData(data);
     setSelectedPaymentMethod(data.paymentMethod);
+
+    trackClientEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
+      category: 'ecommerce',
+      value: total,
+      properties: {
+        currency: 'GBP',
+        value: total,
+        items: cartState.items.map((i) => ({
+          item_id: i.id,
+          item_name: i.name,
+          item_category: i.category,
+          price: i.price,
+          quantity: i.quantity,
+        })),
+      },
+    });
 
     // If Stripe is selected, redirect to Stripe Checkout
     if (data.paymentMethod === 'stripe') {
@@ -61,6 +88,10 @@ function CheckoutPageContent() {
             userId: user?.id,
             successUrl: `${baseUrl}/thank-you?sid={CHECKOUT_SESSION_ID}`,
             cancelUrl: `${baseUrl}/checkout?canceled=1`,
+            discount:
+              discount && discount.discountCodeId
+                ? { id: discount.discountCodeId, code: discount.code }
+                : undefined,
           }),
         });
 
@@ -120,6 +151,10 @@ function CheckoutPageContent() {
           cartItems: cartState.items,
           userId: user?.id,
           paymentIntentId,
+          discount:
+            discount && discount.discountCodeId
+              ? { id: discount.discountCodeId, code: discount.code }
+              : undefined,
         }),
       });
 
@@ -237,6 +272,8 @@ function CheckoutPageContent() {
             <OrderSummary
               paymentMethod={selectedPaymentMethod}
               isLoading={isProcessing}
+              discount={discount}
+              onDiscountChange={setDiscount}
             />
           </div>
         </div>

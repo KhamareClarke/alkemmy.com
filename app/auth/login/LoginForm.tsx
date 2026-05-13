@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SocialLoginButtons from '@/components/auth/SocialLoginButtons';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -164,6 +165,17 @@ export default function LoginForm() {
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </Button>
+
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-gray-50 px-2 text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <SocialLoginButtons />
 
           {/* Links */}
           <div className="text-center space-y-2">

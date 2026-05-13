@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createOrder, updateOrderPaymentStatus } from '@/lib/order-api';
+import { createOrder, updateOrderPaymentStatus, type OrderDiscountMeta } from '@/lib/order-api';
 import { sendOrderConfirmationEmail, sendAdminNotificationEmail } from '@/lib/email-service';
+import { sendSmsSafe } from '@/lib/sms/send';
+import { buildSmsBody } from '@/lib/sms/templates';
 import { CartItem } from '@/lib/cart-context';
 import { supabase } from '@/lib/supabase';
+import { resolveCheckoutDiscount } from '@/lib/discounts/resolve-checkout-discount';
+import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
+import { adminSupabase } from '@/lib/admin-supabase';
 
 export async function POST(request: NextRequest) {
   try {
-    const { orderData, cartItems, userId, paymentIntentId } = await request.json();
+    const { orderData, cartItems, userId, paymentIntentId, discount: discountPayload } =
+      await request.json();
 
     console.log('Processing order with data:', {
       orderData: orderData ? 'present' : 'missing',
@@ -23,8 +29,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the order (pass paymentIntentId if available)
-    const { order, orderItems } = await createOrder(orderData, cartItems, userId, paymentIntentId);
+    let pricedCart = cartItems as CartItem[];
+    let discountMeta: OrderDiscountMeta | null = null;
+    try {
+      const resolved = await resolveCheckoutDiscount(
+        discountPayload?.id && discountPayload?.code
+          ? { id: String(discountPayload.id), code: String(discountPayload.code) }
+          : null,
+        cartItems as CartItem[]
+      );
+      pricedCart = resolved.pricedCart as CartItem[];
+      discountMeta = resolved.discountMeta;
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Invalid discount' }, { status: 400 });
+    }
+
+    const { order, orderItems } = await createOrder(
+      orderData,
+      pricedCart,
+      userId,
+      paymentIntentId,
+      discountMeta
+    );
+
+    if (discountMeta?.discountCodeId) {
+      await incrementDiscountCodeUsage(adminSupabase, discountMeta.discountCodeId);
+    }
 
     // If payment was successful, update the order status
     if (paymentIntentId) {
@@ -73,6 +103,15 @@ export async function POST(request: NextRequest) {
       
       // Send admin notification email
       await sendAdminNotificationEmail(emailData);
+
+      const phoneRaw = orderData.shippingAddress?.phone;
+      if (phoneRaw && String(phoneRaw).trim()) {
+        sendSmsSafe({
+          to: String(phoneRaw).trim(),
+          type: 'order_confirmation',
+          body: buildSmsBody('order_confirmation', { orderNumber: order.order_number }),
+        });
+      }
     }
 
     return NextResponse.json({

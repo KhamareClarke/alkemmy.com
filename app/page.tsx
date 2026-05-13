@@ -11,6 +11,8 @@ import ProductQuantityControls from '@/components/ProductQuantityControls';
 import BundlesSection from '@/components/BundlesSection';
 import NewsletterSignup from '@/components/NewsletterSignup';
 import WhatsAppWidget from '@/components/WhatsAppWidget';
+import HomeHeroBanners from '@/components/banners/HomeHeroBanners';
+import HomeFooterBanner from '@/components/banners/HomeFooterBanner';
 import { useAuth } from '@/lib/auth-context';
 import { getAllProducts } from '@/lib/products';
 import { Product } from '@/lib/supabase';
@@ -294,6 +296,8 @@ export default function Home() {
           </motion.div>
         )}
       </motion.nav>
+
+      <HomeHeroBanners />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden cinematic-grain ambient-vignette">
@@ -883,7 +887,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-matte-black text-white pt-32 pb-12 relative overflow-hidden border-t border-white/5">
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+          <HomeFooterBanner />
+
           {/* Brand Seal */}
           <motion.div
             initial={{ opacity: 0 }}

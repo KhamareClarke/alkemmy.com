@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sendNotificationEmail } from '@/lib/email/send-notification';
+import { getAdminEmail } from '@/lib/email/smtp';
 
 // GET /api/reviews?productId=xxx - Get reviews for a product
 export async function GET(request: NextRequest) {
@@ -106,6 +108,24 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error creating review:', insertError);
       return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
+    }
+
+    try {
+      const { data: product } = await supabase
+        .from('products')
+        .select('name')
+        .eq('id', productId)
+        .single();
+      const firstName =
+        (review.user as { first_name?: string } | null)?.first_name ?? '';
+      void sendNotificationEmail('admin_new_review', {
+        to: getAdminEmail(),
+        firstName,
+        productName: product?.name ?? 'Product',
+        rating: String(rating),
+      }).catch((e) => console.error('admin_new_review email:', e));
+    } catch (e) {
+      console.error('admin_new_review email setup:', e);
     }
 
     return NextResponse.json({ review }, { status: 201 });

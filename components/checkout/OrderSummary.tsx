@@ -5,22 +5,35 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Truck, Leaf, CreditCard, Smartphone } from 'lucide-react';
+import { Lock, Truck, Leaf, CreditCard } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import Image from 'next/image';
+import DiscountCodeInput, { type AppliedDiscountState } from '@/components/checkout/DiscountCodeInput';
 
 interface OrderSummaryProps {
   onPlaceOrder?: () => void;
   isLoading?: boolean;
   paymentMethod?: 'stripe' | 'paypal' | 'cash_on_delivery';
+  discount: AppliedDiscountState | null;
+  onDiscountChange: (v: AppliedDiscountState | null) => void;
 }
 
-export default function OrderSummary({ onPlaceOrder, isLoading, paymentMethod }: OrderSummaryProps) {
+export default function OrderSummary({
+  onPlaceOrder,
+  isLoading,
+  paymentMethod,
+  discount,
+  onDiscountChange,
+}: OrderSummaryProps) {
   const { state: cartState } = useCart();
 
   const subtotal = cartState.totalPrice;
-  const shipping = subtotal > 50 ? 0 : 4.99; // Free shipping over £50
-  const total = subtotal + shipping;
+  const discountAmount = discount?.discountAmount ?? 0;
+  const afterDiscount = Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
+  const shipping = afterDiscount > 50 ? 0 : 4.99;
+  const total = afterDiscount + shipping;
+
+  const categories = Array.from(new Set(cartState.items.map((i) => i.category)));
 
   return (
     <motion.div
@@ -69,12 +82,26 @@ export default function OrderSummary({ onPlaceOrder, isLoading, paymentMethod }:
             ))}
           </div>
 
+          <DiscountCodeInput
+            subtotal={subtotal}
+            categories={categories}
+            value={discount}
+            onApplied={onDiscountChange}
+          />
+
           {/* Price Breakdown */}
           <div className="space-y-3 border-t border-gray-200 pt-4">
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal</span>
               <span className="font-medium">£{subtotal.toFixed(2)}</span>
             </div>
+
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>Discount ({discount?.code})</span>
+                <span className="font-medium">−£{discountAmount.toFixed(2)}</span>
+              </div>
+            )}
             
             <div className="flex justify-between">
               <span className="text-gray-600">Shipping</span>
@@ -87,9 +114,9 @@ export default function OrderSummary({ onPlaceOrder, isLoading, paymentMethod }:
               </span>
             </div>
 
-            {subtotal < 50 && (
+            {afterDiscount < 50 && (
               <div className="text-sm text-gray-500">
-                Add £{(50 - subtotal).toFixed(2)} more for free shipping
+                Add £{(50 - afterDiscount).toFixed(2)} more for free shipping
               </div>
             )}
 

@@ -1,12 +1,21 @@
+import type { Metadata } from 'next';
 import ProductClientPage from './ProductClientPage';
 import { getProductBySlug, getRelatedProducts } from '@/lib/products';
+import { buildProductMetadata } from '@/lib/seo/product-metadata';
 
-// Dynamic route - no static generation needed
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  if (!product) {
+    return { title: 'Product | Alkhemmy', description: 'Product not found.' };
+  }
+  return buildProductMetadata(product);
+}
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  const relatedProducts = await getRelatedProducts(slug);
+  const relatedProducts = product ? await getRelatedProducts(slug) : [];
 
   if (!product) {
     return (

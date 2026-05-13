@@ -11,6 +11,9 @@ export interface CartItem {
   quantity: number;
   category: string;
   slug: string;
+  variantId?: string;
+  variantLabel?: string;
+  sku?: string;
 }
 
 // Cart state type
@@ -194,6 +197,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             quantity: item.quantity,
             category: item.category,
             slug: item.slug,
+            variantId: item.variantId,
+            variantLabel: item.variantLabel,
+            sku: item.sku,
           };
         });
         
@@ -210,6 +216,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             quantity: item.quantity,
             category: item.category,
             slug: item.slug,
+            variantId: item.variantId,
+            variantLabel: item.variantLabel,
+            sku: item.sku,
           }));
           localStorage.setItem('alkemmy-cart', JSON.stringify(minimalItems));
         } else {

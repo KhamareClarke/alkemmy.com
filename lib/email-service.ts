@@ -1,6 +1,6 @@
 // Email service for order confirmations using Nodemailer
-import nodemailer from 'nodemailer';
 import { adminSupabase } from './admin-supabase';
+import { createEmailTransporter, getFromEmail, getAdminEmail } from './email/smtp';
 
 export interface OrderConfirmationEmail {
   orderNumber: string;
@@ -24,26 +24,15 @@ export interface OrderConfirmationEmail {
   orderDate: string;
 }
 
-// Create transporter for Gmail
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'khamareclarke@gmail.com',
-      pass: 'ovga hgzy rltc ifyh' // App password
-    }
-  });
-};
-
 export async function sendOrderConfirmationEmail(emailData: OrderConfirmationEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `Order Confirmation - ${emailData.orderNumber} | Alkemmy`;
     const htmlBody = generateOrderConfirmationHTML(emailData);
     const textBody = generateOrderConfirmationText(emailData);
     
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: emailData.customerEmail,
       subject: subject,
       html: htmlBody,
@@ -56,7 +45,7 @@ export async function sendOrderConfirmationEmail(emailData: OrderConfirmationEma
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'order_confirmation',
@@ -77,7 +66,7 @@ export async function sendOrderConfirmationEmail(emailData: OrderConfirmationEma
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: `Order Confirmation - ${emailData.orderNumber} | Alkemmy`,
           body: generateOrderConfirmationText(emailData),
           email_type: 'order_confirmation',
@@ -92,14 +81,14 @@ export async function sendOrderConfirmationEmail(emailData: OrderConfirmationEma
 
 export async function sendAdminNotificationEmail(orderData: OrderConfirmationEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `New Order Received - ${orderData.orderNumber} | Alkemmy Admin`;
     const htmlBody = generateAdminNotificationHTML(orderData);
     const textBody = generateAdminNotificationText(orderData);
     
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
-      to: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
+      to: getAdminEmail(),
       subject: subject,
       html: htmlBody,
       text: textBody
@@ -110,8 +99,8 @@ export async function sendAdminNotificationEmail(orderData: OrderConfirmationEma
       await adminSupabase
         .from('emails')
         .insert({
-          to_email: 'khamareclarke@gmail.com',
-          from_email: 'khamareclarke@gmail.com',
+          to_email: getAdminEmail(),
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'admin_notification',
@@ -178,13 +167,13 @@ export interface OrderStatusUpdateEmail {
 
 export async function sendPaymentSuccessEmail(emailData: PaymentSuccessEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `Payment Successful - Order ${emailData.orderNumber} | Alkemmy`;
     const htmlBody = generatePaymentSuccessHTML(emailData);
     const textBody = generatePaymentSuccessText(emailData);
     
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: emailData.customerEmail,
       subject: subject,
       html: htmlBody,
@@ -197,7 +186,7 @@ export async function sendPaymentSuccessEmail(emailData: PaymentSuccessEmail): P
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'payment_success',
@@ -218,7 +207,7 @@ export async function sendPaymentSuccessEmail(emailData: PaymentSuccessEmail): P
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: `Payment Successful - Order ${emailData.orderNumber} | Alkemmy`,
           body: generatePaymentSuccessText(emailData),
           email_type: 'payment_success',
@@ -232,13 +221,13 @@ export async function sendPaymentSuccessEmail(emailData: PaymentSuccessEmail): P
 
 export async function sendPaymentFailedEmail(emailData: PaymentFailedEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `Payment Failed - ${emailData.orderNumber ? `Order ${emailData.orderNumber}` : 'Your Order'} | Alkemmy`;
     const htmlBody = generatePaymentFailedHTML(emailData);
     const textBody = generatePaymentFailedText(emailData);
     
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: emailData.customerEmail,
       subject: subject,
       html: htmlBody,
@@ -251,7 +240,7 @@ export async function sendPaymentFailedEmail(emailData: PaymentFailedEmail): Pro
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'payment_failed',
@@ -272,7 +261,7 @@ export async function sendPaymentFailedEmail(emailData: PaymentFailedEmail): Pro
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: `Payment Failed - ${emailData.orderNumber ? `Order ${emailData.orderNumber}` : 'Your Order'} | Alkemmy`,
           body: generatePaymentFailedText(emailData),
           email_type: 'payment_failed',
@@ -286,13 +275,13 @@ export async function sendPaymentFailedEmail(emailData: PaymentFailedEmail): Pro
 
 export async function sendOrderStatusUpdateEmail(emailData: OrderStatusUpdateEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `Order ${emailData.newStatus.charAt(0).toUpperCase() + emailData.newStatus.slice(1)} - ${emailData.orderNumber} | Alkemmy`;
     const htmlBody = generateOrderStatusUpdateHTML(emailData);
     const textBody = generateOrderStatusUpdateText(emailData);
     
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: emailData.customerEmail,
       subject: subject,
       html: htmlBody,
@@ -305,7 +294,7 @@ export async function sendOrderStatusUpdateEmail(emailData: OrderStatusUpdateEma
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'status_update',
@@ -326,7 +315,7 @@ export async function sendOrderStatusUpdateEmail(emailData: OrderStatusUpdateEma
         .from('emails')
         .insert({
           to_email: emailData.customerEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: `Order ${emailData.newStatus.charAt(0).toUpperCase() + emailData.newStatus.slice(1)} - ${emailData.orderNumber} | Alkemmy`,
           body: generateOrderStatusUpdateText(emailData),
           email_type: 'status_update',
@@ -399,7 +388,7 @@ function generateOrderConfirmationHTML(emailData: OrderConfirmationEmail): strin
             <li>Your order will arrive within 3-5 business days</li>
           </ul>
           
-          <p>If you have any questions, please contact us at khamareclarke@gmail.com</p>
+          <p>If you have any questions, please contact us at ${getFromEmail()}</p>
           
           <div class="footer">
             <p>Thank you for choosing Alkemmy for your natural luxury needs!</p>
@@ -437,7 +426,7 @@ What's Next?
 - You'll receive a shipping confirmation when your order is dispatched
 - Your order will arrive within 3-5 business days
 
-If you have any questions, please contact us at khamareclarke@gmail.com
+If you have any questions, please contact us at ${getFromEmail()}
 
 Thank you for choosing Alkemmy for your natural luxury needs!
 
@@ -635,7 +624,7 @@ function generateOrderStatusUpdateHTML(emailData: OrderStatusUpdateEmail): strin
           <h3>What's Next?</h3>
           ${getNextStepsContent(emailData.newStatus)}
           
-          <p>If you have any questions, please contact us at khamareclarke@gmail.com</p>
+          <p>If you have any questions, please contact us at ${getFromEmail()}</p>
           
           <div class="footer">
             <p>Thank you for choosing Alkemmy for your natural luxury needs!</p>
@@ -674,7 +663,7 @@ Your order has been successfully delivered. We hope you enjoy your Alkemmy produ
 What's Next?
 ${getNextStepsContent(emailData.newStatus).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ')}
 
-If you have any questions, please contact us at khamareclarke@gmail.com
+If you have any questions, please contact us at ${getFromEmail()}
 
 Thank you for choosing Alkemmy for your natural luxury needs!
 
@@ -746,7 +735,7 @@ function generatePaymentSuccessHTML(emailData: PaymentSuccessEmail): string {
             <li>Your order will arrive within 3-5 business days</li>
           </ul>
           
-          <p>If you have any questions about your payment or order, please contact us at khamareclarke@gmail.com</p>
+          <p>If you have any questions about your payment or order, please contact us at ${getFromEmail()}</p>
           
           <div class="footer">
             <p>Thank you for choosing Alkemmy for your natural luxury needs!</p>
@@ -785,7 +774,7 @@ What's Next?
 - We'll send you a shipping notification when your order is dispatched
 - Your order will arrive within 3-5 business days
 
-If you have any questions about your payment or order, please contact us at khamareclarke@gmail.com
+If you have any questions about your payment or order, please contact us at ${getFromEmail()}
 
 Thank you for choosing Alkemmy for your natural luxury needs!
 
@@ -871,7 +860,7 @@ function generatePaymentFailedHTML(emailData: PaymentFailedEmail): string {
             <li>Network or connection issues</li>
           </ul>
           
-          <p><strong>Need Help?</strong> If you continue to experience issues, please contact us at khamareclarke@gmail.com and we'll be happy to assist you.</p>
+          <p><strong>Need Help?</strong> If you continue to experience issues, please contact us at ${getFromEmail()} and we'll be happy to assist you.</p>
           
           <p>Your order has not been placed. No charges have been made to your account.</p>
           
@@ -921,7 +910,7 @@ Common Reasons for Payment Failure:
 - Bank security restrictions
 - Network or connection issues
 
-Need Help? If you continue to experience issues, please contact us at khamareclarke@gmail.com and we'll be happy to assist you.
+Need Help? If you continue to experience issues, please contact us at ${getFromEmail()} and we'll be happy to assist you.
 
 Your order has not been placed. No charges have been made to your account.
 
@@ -999,13 +988,13 @@ export interface PasswordResetCodeEmail {
 
 export async function sendPasswordResetCodeEmail(emailData: PasswordResetCodeEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `Password Reset Code | Alkemmy`;
     const htmlBody = generatePasswordResetCodeHTML(emailData);
     const textBody = generatePasswordResetCodeText(emailData);
 
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: emailData.email,
       subject: subject,
       html: htmlBody,
@@ -1017,7 +1006,7 @@ export async function sendPasswordResetCodeEmail(emailData: PasswordResetCodeEma
         .from('emails')
         .insert({
           to_email: emailData.email,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'password_reset',
@@ -1117,13 +1106,13 @@ export interface ContactFormEmail {
 
 export async function sendContactFormEmail(emailData: ContactFormEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `Thank You for Contacting Alkemmy - ${emailData.subject}`;
     const htmlBody = generateContactFormConfirmationHTML(emailData);
     const textBody = generateContactFormConfirmationText(emailData);
 
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: emailData.email,
       subject: subject,
       html: htmlBody,
@@ -1135,7 +1124,7 @@ export async function sendContactFormEmail(emailData: ContactFormEmail): Promise
         .from('emails')
         .insert({
           to_email: emailData.email,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'contact_confirmation',
@@ -1153,16 +1142,16 @@ export async function sendContactFormEmail(emailData: ContactFormEmail): Promise
 
 export async function sendContactFormAdminNotification(emailData: ContactFormEmail): Promise<void> {
   try {
-    const transporter = createTransporter();
+    const transporter = createEmailTransporter();
     const subject = `New Contact Form Submission: ${emailData.subject} | Alkemmy`;
     const htmlBody = generateContactFormAdminHTML(emailData);
     const textBody = generateContactFormAdminText(emailData);
 
     // Send to admin email
-    const adminEmail = 'khamareclarke@gmail.com'; // Change this to your admin email
+    const adminEmail = getAdminEmail();
 
     await transporter.sendMail({
-      from: 'khamareclarke@gmail.com',
+      from: getFromEmail(),
       to: adminEmail,
       subject: subject,
       html: htmlBody,
@@ -1175,7 +1164,7 @@ export async function sendContactFormAdminNotification(emailData: ContactFormEma
         .from('emails')
         .insert({
           to_email: adminEmail,
-          from_email: 'khamareclarke@gmail.com',
+          from_email: getFromEmail(),
           subject: subject,
           body: textBody,
           email_type: 'contact_notification',

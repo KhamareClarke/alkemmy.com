@@ -6,6 +6,8 @@ import { ShoppingCart, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart, cartActions, CartItem } from '@/lib/cart-context';
 import CartNotification from './CartNotification';
+import { trackClientEvent } from '@/lib/analytics/client-track';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/types';
 
 interface AddToCartButtonProps {
   product: {
@@ -22,6 +24,12 @@ interface AddToCartButtonProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
+  /** When set, cart line id becomes composite (product + variant) */
+  variantId?: string;
+  variantLabel?: string;
+  sku?: string;
+  /** Override unit price (e.g. variant-specific) */
+  priceOverride?: number;
 }
 
 export default function AddToCartButton({
@@ -30,6 +38,10 @@ export default function AddToCartButton({
   className = '',
   size = 'md',
   disabled = false,
+  variantId,
+  variantLabel,
+  sku,
+  priceOverride,
 }: AddToCartButtonProps) {
   const { dispatch } = useCart();
   const [isAdded, setIsAdded] = useState(false);
@@ -40,20 +52,43 @@ export default function AddToCartButton({
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (isOutOfStock) return;
 
+    const unitPrice = priceOverride ?? product.price;
+    const lineId = variantId ? `${product.id}::${variantId}` : product.id;
+
     const cartItem: CartItem = {
-      id: product.id,
+      id: lineId,
       name: product.title,
       image: product.images[0] || '/placeholder-product.jpg',
-      price: product.price,
+      price: unitPrice,
       quantity,
       category: product.category,
       slug: product.slug,
+      variantId,
+      variantLabel,
+      sku,
     };
 
     dispatch(cartActions.addItem(cartItem));
+
+    trackClientEvent(ANALYTICS_EVENTS.ADD_TO_CART, {
+      category: 'ecommerce',
+      value: unitPrice * quantity,
+      properties: {
+        currency: 'GBP',
+        items: [
+          {
+            item_id: lineId,
+            item_name: product.title,
+            item_category: product.category,
+            price: unitPrice,
+            quantity,
+          },
+        ],
+      },
+    });
     
     // Show success animation
     setIsAdded(true);

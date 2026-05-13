@@ -64,18 +64,25 @@ function generateOrderNumber(): string {
   return `ALK-${timestamp}-${random}`.toUpperCase();
 }
 
+export interface OrderDiscountMeta {
+  discountCodeId: string
+  discountCode: string
+  discountAmount: number
+}
+
 // Create order in database
 export async function createOrder(
   orderData: OrderData,
   cartItems: CartItem[],
   userId?: string,
-  paymentIntentId?: string
+  paymentIntentId?: string,
+  discount?: OrderDiscountMeta | null
 ): Promise<{ order: Order; orderItems: OrderItem[] }> {
   try {
     const orderNumber = generateOrderNumber();
-    const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const shipping = totalAmount > 50 ? 0 : 4.99;
-    const finalTotal = totalAmount + shipping;
+    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const shipping = subtotal > 50 ? 0 : 4.99;
+    const finalTotal = subtotal + shipping;
 
     // Create shipping address
     const { data: shippingAddress, error: shippingError } = await supabase
@@ -148,6 +155,12 @@ export async function createOrder(
       notes: orderNotes,
     };
 
+    if (discount && discount.discountAmount > 0) {
+      orderDataToInsert.discount_code_id = discount.discountCodeId;
+      orderDataToInsert.discount_code = discount.discountCode;
+      orderDataToInsert.discount_amount = discount.discountAmount;
+    }
+
     // Add payment_intent_id if provided and column exists
     if (paymentIntentId) {
       try {
@@ -166,14 +179,21 @@ export async function createOrder(
     if (orderError) throw orderError;
 
     // Create order items
-    const orderItemsData = cartItems.map(item => ({
-      order_id: order.id,
-      product_id: item.id,
-      product_name: item.name,
-      product_image: item.image,
-      quantity: item.quantity,
-      price: item.price,
-    }));
+    const orderItemsData = cartItems.map(item => {
+      const base: Record<string, unknown> = {
+        order_id: order.id,
+        product_id: String(item.id).split('::')[0],
+        product_name: item.name,
+        product_image: item.image,
+        quantity: item.quantity,
+        price: item.price,
+      };
+      const vid = (item as CartItem & { variantId?: string }).variantId;
+      const vlabel = (item as CartItem & { variantLabel?: string }).variantLabel;
+      if (vid) base.variant_id = vid;
+      if (vlabel) base.variant_label = vlabel;
+      return base;
+    });
 
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
@@ -181,6 +201,23 @@ export async function createOrder(
       .select();
 
     if (itemsError) throw itemsError;
+
+    void import('@/lib/cdp/order-hooks')
+      .then((m) =>
+        m.onOrderCreated({
+          userId: userId ?? null,
+          orderId: order.id,
+          orderNumber,
+          total: finalTotal,
+          guestEmail: orderData.shippingAddress.email,
+          items: orderItemsData.map((it: Record<string, unknown>) => ({
+            product_id: String(it.product_id),
+            quantity: Number(it.quantity) || 0,
+            variant_id: it.variant_id ? String(it.variant_id) : undefined,
+          })),
+        })
+      )
+      .catch((e) => console.error('[cdp] onOrderCreated', e));
 
     return { order, orderItems };
   } catch (error) {
@@ -233,6 +270,25 @@ export async function updateOrderPaymentStatus(
       .eq('id', orderId);
 
     if (error) throw error;
+
+    if (paymentStatus === 'paid') {
+      const { data: paidOrder } = await supabase
+        .from('orders')
+        .select('user_id, total_amount')
+        .eq('id', orderId)
+        .maybeSingle();
+      if (paidOrder?.user_id) {
+        void import('@/lib/cdp/order-hooks')
+          .then((m) =>
+            m.onOrderPaymentPaid({
+              userId: paidOrder.user_id as string,
+              orderId,
+              orderTotal: Number(paidOrder.total_amount) || 0,
+            })
+          )
+          .catch((e) => console.error('[cdp] onOrderPaymentPaid', e));
+      }
+    }
   } catch (error) {
     console.error('Error updating order payment status:', error);
     throw new Error('Failed to update order payment status');

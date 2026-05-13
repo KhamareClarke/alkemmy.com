@@ -232,6 +232,15 @@ export default function AdminOrdersPage() {
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
           </div>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm">
+            <Link href="/admin/banners" className="text-[#B8941F] hover:underline font-medium">
+              Promotional banners
+            </Link>
+            <span className="text-gray-300">|</span>
+            <Link href="/admin/discounts" className="text-[#B8941F] hover:underline font-medium">
+              Discount codes
+            </Link>
+          </div>
         </div>
       </div>
 

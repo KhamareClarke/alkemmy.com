@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
+import { resolveCheckoutDiscount } from '@/lib/discounts/resolve-checkout-discount';
+import type { OrderDiscountMeta } from '@/lib/order-api';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-02-24.acacia',
@@ -12,12 +14,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
     }
 
-    const { 
-      cartItems, 
-      orderData, 
+    const {
+      cartItems,
+      orderData,
       userId,
       successUrl,
-      cancelUrl 
+      cancelUrl,
+      discount: discountPayload,
     } = await request.json();
 
     if (!cartItems || cartItems.length === 0) {
@@ -34,29 +37,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate totals
-    const subtotal = cartItems.reduce((sum: number, item: any) => 
-      sum + (item.price * item.quantity), 0
+    let pricedCart = cartItems as any[];
+    let discountMeta: OrderDiscountMeta | null = null;
+    try {
+      const resolved = await resolveCheckoutDiscount(
+        discountPayload?.id && discountPayload?.code
+          ? { id: String(discountPayload.id), code: String(discountPayload.code) }
+          : null,
+        cartItems as any
+      );
+      pricedCart = resolved.pricedCart as any[];
+      discountMeta = resolved.discountMeta;
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message || 'Invalid discount' },
+        { status: 400 }
+      );
+    }
+
+    const subtotal = pricedCart.reduce(
+      (sum: number, item: any) => sum + (item.price * item.quantity),
+      0
     );
     const shipping = subtotal > 50 ? 0 : 4.99;
     const total = subtotal + shipping;
 
-    // Log for debugging
     console.log('Creating checkout session with:', {
-      cartItemsCount: cartItems.length,
+      cartItemsCount: pricedCart.length,
       subtotal,
       shipping,
       total,
-      firstItem: cartItems[0] ? {
-        name: cartItems[0].name,
-        price: cartItems[0].price,
-        image: cartItems[0].image,
-        quantity: cartItems[0].quantity
-      } : null
+      discount: discountMeta?.discountCode,
+      firstItem: pricedCart[0]
+        ? {
+            name: pricedCart[0].name,
+            price: pricedCart[0].price,
+            image: pricedCart[0].image,
+            quantity: pricedCart[0].quantity,
+          }
+        : null,
     });
 
-    // Create line items for Stripe - keep minimal to avoid "URL must be 2048 characters or less"
-    const lineItems = cartItems.map((item: any) => {
+    const lineItems = pricedCart.map((item: any) => {
       const productName = (item.name || 'Product').substring(0, 22);
       const price = parseFloat(item.price);
       if (isNaN(price) || price <= 0) {
@@ -81,7 +103,6 @@ export async function POST(request: NextRequest) {
           currency: 'gbp',
           product_data: {
             name: 'Shipping',
-            description: 'Standard shipping',
           },
           unit_amount: Math.round(shipping * 100),
         },
@@ -138,14 +159,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert order_items for the temp order so admin/customer see items even before webhook runs
-    const orderItemsData = cartItems.map((item: any) => ({
-      order_id: tempOrder.id,
-      product_id: String(item.id),
-      product_name: item.name || 'Product',
-      product_image: item.image || null,
-      quantity: item.quantity || 1,
-      price: parseFloat(item.price) || 0,
-    }));
+    const orderItemsData = pricedCart.map((item: any) => {
+      const baseId = String(item.id).split('::')[0];
+      const row: Record<string, unknown> = {
+        order_id: tempOrder.id,
+        product_id: baseId,
+        product_name: item.name || 'Product',
+        product_image: item.image || null,
+        quantity: item.quantity || 1,
+        price: parseFloat(item.price) || 0,
+      };
+      const vid = item.variantId as string | undefined;
+      const vlabel = item.variantLabel as string | undefined;
+      if (vid) row.variant_id = vid;
+      if (vlabel) row.variant_label = vlabel;
+      return row;
+    });
     const { error: itemsError } = await supabase
       .from('order_items')
       .insert(orderItemsData);
@@ -161,10 +190,11 @@ export async function POST(request: NextRequest) {
         .insert({
           temp_order_id: tempOrder.id,
           order_data: orderData as any,
-          cart_items: cartItems as any,
+          cart_items: pricedCart as any,
           subtotal,
           shipping,
           total,
+          ...(discountMeta ? { discount: discountMeta as any } : {}),
         })
         .select()
         .single();
@@ -176,12 +206,13 @@ export async function POST(request: NextRequest) {
         const compactData = {
           e: orderData.shippingAddress.email, // 'e' for email
           n: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`, // 'n' for name
-          i: cartItems.map((item: any) => ({
+          i: pricedCart.map((item: any) => ({
             id: item.id,
             q: item.quantity, // 'q' for quantity
             p: item.price // 'p' for price
           })),
-          t: { s: subtotal, sh: shipping, tot: total } // 't' for totals, 's' for subtotal, 'sh' for shipping, 'tot' for total
+          t: { s: subtotal, sh: shipping, tot: total }, // 't' for totals
+          d: discountMeta || undefined,
         };
         
         await supabase
@@ -195,12 +226,13 @@ export async function POST(request: NextRequest) {
       const compactData = {
         e: orderData.shippingAddress.email, // 'e' for email
         n: `${orderData.shippingAddress.firstName} ${orderData.shippingAddress.lastName}`, // 'n' for name
-        i: cartItems.map((item: any) => ({
+        i: pricedCart.map((item: any) => ({
           id: item.id,
           q: item.quantity, // 'q' for quantity
           p: item.price // 'p' for price
         })),
-        t: { s: subtotal, sh: shipping, tot: total } // 't' for totals
+        t: { s: subtotal, sh: shipping, tot: total }, // 't' for totals
+        d: discountMeta || undefined,
       };
       
       await supabase
@@ -230,7 +262,7 @@ export async function POST(request: NextRequest) {
         to: tempOrder.id, // Short key name
         uid: userId || 'guest', // Short key name
       },
-      allow_promotion_codes: true,
+      allow_promotion_codes: !discountMeta,
     };
 
     // Only add shipping address collection if we want Stripe to collect it

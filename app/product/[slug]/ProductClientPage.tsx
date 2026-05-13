@@ -12,6 +12,16 @@ import ReviewsList from '@/components/ReviewsList';
 import ReviewForm from '@/components/ReviewForm';
 import Link from 'next/link';
 import { Product } from '@/lib/supabase';
+import VariantSelector from '@/components/products/VariantSelector';
+import type { VariantOptionRow, ProductVariantRow } from '@/lib/products/variant-management';
+import {
+  findVariantMatchingOptions,
+  formatVariantLabel,
+} from '@/lib/products/variant-management';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { productJsonLd, breadcrumbJsonLd, faqPageJsonLd } from '@/lib/seo/jsonld';
+import { trackClientEvent } from '@/lib/analytics/client-track';
+import { ANALYTICS_EVENTS } from '@/lib/analytics/types';
 
 interface ProductClientPageProps {
   product: Product;
@@ -26,6 +36,48 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [variantOptions, setVariantOptions] = useState<VariantOptionRow[]>([]);
+  const [variants, setVariants] = useState<ProductVariantRow[]>([]);
+  const [selectedVariantOpts, setSelectedVariantOpts] = useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/products/${encodeURIComponent(product.id)}/variants`
+        );
+        const d = await res.json();
+        if (!cancelled && res.ok) {
+          setVariantOptions(d.options || []);
+          setVariants(d.variants || []);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
+
+  const allOptionsPicked =
+    variantOptions.length === 0 ||
+    variantOptions.every((o) => !!selectedVariantOpts[o.option_name]);
+  const resolvedVariant = allOptionsPicked
+    ? findVariantMatchingOptions(variants, selectedVariantOpts)
+    : undefined;
+  const displayPrice =
+    resolvedVariant != null &&
+    resolvedVariant.price != null &&
+    !Number.isNaN(Number(resolvedVariant.price))
+      ? Number(resolvedVariant.price)
+      : product.price;
+  const displayStock = resolvedVariant ? resolvedVariant.stock : product.inventory;
+  const stockAvailable =
+    variantOptions.length === 0
+      ? product.in_stock && product.inventory > 0
+      : !!resolvedVariant && displayStock > 0;
 
   // Fetch reviews data
   React.useEffect(() => {
@@ -45,6 +97,25 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
 
     fetchReviews();
   }, [product.id]);
+
+  React.useEffect(() => {
+    trackClientEvent(ANALYTICS_EVENTS.PRODUCT_VIEW, {
+      category: 'ecommerce',
+      properties: {
+        currency: 'GBP',
+        value: displayPrice,
+        items: [
+          {
+            item_id: product.id,
+            item_name: product.title,
+            item_category: product.category,
+            price: displayPrice,
+            quantity: 1,
+          },
+        ],
+      },
+    });
+  }, [product.id, product.title, product.category, displayPrice]);
 
   // Handle scroll for floating cart
   React.useEffect(() => {
@@ -94,6 +165,36 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
 
   return (
     <div className="min-h-screen bg-white">
+      <JsonLd
+        data={productJsonLd(product, {
+          ratingValue: averageRating || product.rating,
+          reviewCount: totalReviews || product.review_count,
+        })}
+      />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: 'Home', path: '/' },
+          { name: 'Shop', path: '/shop' },
+          { name: product.title, path: `/product/${product.slug}` },
+        ])}
+      />
+      <JsonLd
+        data={faqPageJsonLd([
+          {
+            question: `Is ${product.title} suitable for sensitive skin?`,
+            answer:
+              'Our formulas are crafted for a wide range of skin types. Patch test before full use and consult the ingredient list if you have known allergies.',
+          },
+          {
+            question: 'How long does UK shipping take?',
+            answer: 'Most UK orders dispatch within 1–2 business days. You will receive tracking by email when your order ships.',
+          },
+          {
+            question: 'What is your return policy?',
+            answer: 'Contact support with your order number if you are not satisfied; we will help with a return or exchange where applicable.',
+          },
+        ])}
+      />
       {/* Floating Add to Cart Button */}
       <motion.div
         initial={{ opacity: 0, y: 100 }}
@@ -111,7 +212,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
           </div>
           <div>
             <p className="font-semibold text-gray-900">{product.title}</p>
-            <p className="text-[#D4AF37] font-bold">£{product.price}</p>
+            <p className="text-[#D4AF37] font-bold">£{displayPrice.toFixed(2)}</p>
           </div>
           <div className="flex items-center space-x-2">
             <button
@@ -208,7 +309,9 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
               </div>
 
               {/* Price */}
-              <div className="text-4xl font-bold text-[#D4AF37] mb-6">£{product.price}</div>
+              <div className="text-4xl font-bold text-[#D4AF37] mb-6">
+                £{displayPrice.toFixed(2)}
+              </div>
 
               {/* Short Benefit */}
               <p className="text-xl text-gray-700 leading-relaxed mb-6">
@@ -226,6 +329,15 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                   </span>
                 ))}
               </div>
+
+              {variantOptions.length > 0 && (
+                <VariantSelector
+                  options={variantOptions}
+                  variants={variants}
+                  selected={selectedVariantOpts}
+                  onChange={setSelectedVariantOpts}
+                />
+              )}
 
               {/* Quantity Selector */}
               <div className="flex items-center space-x-6 mb-8">
@@ -255,12 +367,25 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                     title: product.title,
                     images: product.images,
                     price: product.price,
-                    category: 'products',
+                    category: product.category,
                     slug: product.slug,
-                    in_stock: product.in_stock,
-                    inventory: product.inventory,
+                    in_stock: stockAvailable,
+                    inventory: Math.max(0, displayStock),
                   }}
+                  priceOverride={
+                    displayPrice !== product.price ? displayPrice : undefined
+                  }
+                  variantId={resolvedVariant?.id}
+                  variantLabel={
+                    resolvedVariant?.option_values
+                      ? formatVariantLabel(
+                          resolvedVariant.option_values as Record<string, string>
+                        )
+                      : undefined
+                  }
+                  sku={resolvedVariant?.sku}
                   quantity={quantity}
+                  disabled={variantOptions.length > 0 && !resolvedVariant}
                   className="flex-1 py-4 text-lg font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
                   size="lg"
                 />
@@ -277,7 +402,7 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
 
               {/* Stock Status */}
               <div className="flex items-center space-x-3 mb-8">
-                {product.in_stock && product.inventory > 0 ? (
+                {stockAvailable ? (
                   <Check className="w-6 h-6 text-green-500" />
                 ) : (
                   <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
@@ -285,11 +410,11 @@ export default function ProductClientPage({ product, relatedProducts }: ProductC
                   </div>
                 )}
                 <span className={`font-semibold text-lg ${
-                  product.in_stock && product.inventory > 0 
+                  stockAvailable
                     ? 'text-green-600' 
                     : 'text-red-600'
                 }`}>
-                  {getStockStatusText(product.in_stock, product.inventory)}
+                  {getStockStatusText(stockAvailable, displayStock)}
                 </span>
               </div>
 

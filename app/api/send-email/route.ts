@@ -1,84 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
-import { adminSupabase } from '@/lib/admin-supabase';
-
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'khamareclarke@gmail.com',
-      pass: 'ovga hgzy rltc ifyh' // App password
-    }
-  });
-};
+import { sendRawEmailSafe } from '@/lib/email/send-core';
+import { getFromEmail } from '@/lib/email/smtp';
 
 export async function POST(request: NextRequest) {
+  let parsed: {
+    to?: string;
+    subject?: string;
+    body?: string;
+    from?: string;
+    emailType?: string;
+  };
+
   try {
-    const { to, subject, body, from, emailType = 'custom' } = await request.json();
+    parsed = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
-    if (!to || !subject || !body) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
+  const { to, subject, body, from, emailType = 'custom' } = parsed;
 
-    const transporter = createTransporter();
-    
-    // Send the email
-    await transporter.sendMail({
-      from: from || 'khamareclarke@gmail.com',
-      to: to,
-      subject: subject,
-      html: body.replace(/\n/g, '<br>'), // Convert line breaks to HTML
-      text: body
+  if (!to || !subject || !body) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  try {
+    await sendRawEmailSafe({
+      to,
+      subject,
+      html: body.replace(/\n/g, '<br>'),
+      text: body,
+      emailType,
+      fromOverride: from,
     });
-    
-    // Store the email in database
-    const { data: emailRecord, error: dbError } = await adminSupabase
-      .from('emails')
-      .insert({
-        to_email: to,
-        from_email: from || 'khamareclarke@gmail.com',
-        subject: subject,
-        body: body,
-        email_type: emailType,
-        status: 'sent'
-      })
-      .select()
-      .single();
 
-    if (dbError) {
-      console.error('❌ Failed to store email in database:', dbError);
-      // Don't fail the request if database storage fails
-    }
-    
-    console.log('✅ Custom email sent to:', to);
-    console.log('✅ Email stored in database:', emailRecord?.id);
-    
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Email sent successfully',
-      emailId: emailRecord?.id 
     });
-    
-  } catch (error: any) {
-    console.error('❌ Failed to send custom email:', error);
-    
-    // Try to store failed email attempt
-    try {
-      const { to, subject, body, from, emailType = 'custom' } = await request.json();
-      await adminSupabase
-        .from('emails')
-        .insert({
-          to_email: to,
-          from_email: from || 'khamareclarke@gmail.com',
-          subject: subject,
-          body: body,
-          email_type: emailType,
-          status: 'failed'
-        });
-    } catch (dbError) {
-      console.error('❌ Failed to store failed email in database:', dbError);
-    }
-    
-    return NextResponse.json({ error: 'Failed to send email: ' + error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to send email';
+    console.error('POST /api/send-email:', error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

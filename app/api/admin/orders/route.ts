@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminSupabase } from '@/lib/admin-supabase';
 import { sendOrderStatusUpdateEmail } from '@/lib/email-service';
+import { sendSmsSafe } from '@/lib/sms/send';
+import { buildSmsBody } from '@/lib/sms/templates';
+import { sendPushToUser } from '@/lib/push/send-broadcast';
+import type { PushPayload } from '@/lib/push/types';
 
 // Async function to send status update email without blocking the main request
 async function sendStatusUpdateEmailAsync(currentOrder: any, status: string, previousStatus: string, userProfile: any) {
@@ -227,6 +231,78 @@ export async function PATCH(request: NextRequest) {
       } catch (emailErr: any) {
         console.error('❌ Status update email failed:', emailErr);
         // Don't fail the status update - email is best-effort
+      }
+    }
+
+    if (previousStatus !== status) {
+      const lines = (currentOrder.order_items || []).map((it: { product_id: string; quantity: number; variant_id?: string }) => ({
+        product_id: it.product_id,
+        quantity: it.quantity,
+        variant_id: it.variant_id,
+      }));
+      void import('@/lib/cdp/order-hooks')
+        .then((m) =>
+          m.onOrderStatusChanged({
+            userId: currentOrder.user_id,
+            guestEmail: currentOrder.shipping_address?.email,
+            orderId: currentOrder.id,
+            orderNumber: currentOrder.order_number,
+            status,
+            previousStatus,
+          })
+        )
+        .catch((e) => console.error('[cdp] onOrderStatusChanged', e));
+      if (status === 'cancelled') {
+        void import('@/lib/inventory/stock')
+          .then((mod) => mod.releaseReservationForOrder(currentOrder.id, lines))
+          .catch((e) => console.error('[inventory] release', e));
+      }
+      if (status === 'shipped') {
+        void import('@/lib/inventory/stock')
+          .then((mod) => mod.confirmShipmentForOrder(currentOrder.id, lines))
+          .catch((e) => console.error('[inventory] ship', e));
+      }
+
+      const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
+      const phoneRaw = currentOrder.shipping_address?.phone;
+      if (phoneRaw && String(phoneRaw).trim()) {
+        const p = String(phoneRaw).trim();
+        if (status === 'shipped') {
+          sendSmsSafe({
+            to: p,
+            type: 'shipment_tracking',
+            body: buildSmsBody('shipment_tracking', {
+              orderNumber: currentOrder.order_number,
+              trackingUrl: siteUrl ? `${siteUrl}/shop` : 'https://alkhemmy.com/shop',
+            }),
+          });
+        } else if (status === 'delivered') {
+          sendSmsSafe({
+            to: p,
+            type: 'delivery',
+            body: buildSmsBody('delivery', { orderNumber: currentOrder.order_number }),
+          });
+        }
+      }
+
+      if (currentOrder.user_id && (status === 'shipped' || status === 'delivered')) {
+        const payload: PushPayload =
+          status === 'shipped'
+            ? {
+                type: 'order_shipped',
+                title: 'Order shipped',
+                body: `Order ${currentOrder.order_number} is on the way.`,
+                url: siteUrl ? `${siteUrl}/shop` : undefined,
+                tag: `order-${currentOrder.id}-shipped`,
+              }
+            : {
+                type: 'order_delivered',
+                title: 'Delivered',
+                body: `Order ${currentOrder.order_number} has been delivered.`,
+                url: siteUrl ? `${siteUrl}/shop` : undefined,
+                tag: `order-${currentOrder.id}-delivered`,
+              };
+        void sendPushToUser(currentOrder.user_id, payload).catch((e) => console.error('[push] order status:', e));
       }
     }
 

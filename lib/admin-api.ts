@@ -22,7 +22,7 @@ export async function createProduct<T extends any>(
   
   const { data, error } = await supabase
     .from(tableName)
-    .insert([productData])
+    .insert([productData as Record<string, unknown>])
     .select()
     .single();
 
@@ -43,7 +43,7 @@ export async function updateProduct<T extends any>(
   
   const { data, error } = await supabase
     .from(tableName)
-    .update(productData)
+    .update(productData as Record<string, unknown>)
     .eq('id', id)
     .select()
     .single();

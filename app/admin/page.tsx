@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Eye, Search, Filter, Save, X, Users, ShoppingBag, Package, Clock, CheckCircle, Truck, AlertCircle, RefreshCw, Mail, Send, FileText, Star, Download, BookOpen, CreditCard } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Search, Filter, Save, X, Users, ShoppingBag, Package, Clock, CheckCircle, Truck, AlertCircle, RefreshCw, Mail, Send, FileText, Star, Download, BookOpen, CreditCard, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useInAppNotifications } from '@/lib/notifications/in-app-context';
 import { 
   getSoapsForAdmin, 
   getHerbalTeasForAdmin, 
@@ -161,6 +162,7 @@ const CATEGORY_FILTERS = {
 };
 
 export default function AdminPage() {
+  const inApp = useInAppNotifications();
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -210,7 +212,7 @@ export default function AdminPage() {
     to: '',
     subject: '',
     body: '',
-    senderEmail: 'khamareclarke@gmail.com'
+    senderEmail: ''
   });
   const [emailTemplates, setEmailTemplates] = useState([
     {
@@ -837,7 +839,7 @@ export default function AdminPage() {
           to: '',
           subject: '',
           body: '',
-          senderEmail: 'khamareclarke@gmail.com'
+          senderEmail: ''
         });
         loadEmails(); // Refresh emails list
       } else {
@@ -1194,6 +1196,22 @@ export default function AdminPage() {
               <p className="text-gray-600 mt-1">Manage your store</p>
             </div>
             <div className="flex items-center space-x-4">
+              <button
+                type="button"
+                onClick={() => {
+                  inApp.clearReviewBadge();
+                  setActiveTab('reviews');
+                }}
+                className="relative rounded-full border border-gray-200 p-2 text-gray-700 hover:bg-gray-50"
+                title="Reviews"
+              >
+                <Bell className="h-5 w-5" />
+                {inApp.reviewBadgeCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {inApp.reviewBadgeCount > 9 ? '9+' : inApp.reviewBadgeCount}
+                  </span>
+                )}
+              </button>
               {activeTab === 'products' && (
                 <>
                   <Button onClick={refreshProducts} variant="outline" className="border-gray-300 hover:bg-gray-50">
