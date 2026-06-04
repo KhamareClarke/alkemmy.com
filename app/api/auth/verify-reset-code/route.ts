@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminSupabase } from '@/lib/admin-supabase';
+import { emitEmpireActivity } from '@/lib/empire-activity';
 
 export async function POST(request: NextRequest) {
   try {
@@ -146,11 +147,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Mark code as used
       await adminSupabase
         .from('password_reset_codes')
         .update({ used: true })
         .eq('id', resetCode.id);
+
+      void emitEmpireActivity({
+        event_type: 'password_reset_complete',
+        user_email: email,
+        user_id: profile.id,
+        message: 'Password reset completed via code',
+        request,
+      });
 
       return NextResponse.json({
         success: true,
@@ -158,7 +166,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If no newPassword, just verify the code
     return NextResponse.json({
       success: true,
       message: 'Code verified successfully',

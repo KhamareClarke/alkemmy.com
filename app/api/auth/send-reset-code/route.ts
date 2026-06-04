@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminSupabase } from '@/lib/admin-supabase';
 import { sendPasswordResetCodeEmail } from '@/lib/email-service';
+import { emitEmpireActivity } from '@/lib/empire-activity';
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,7 +58,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Send email with code
       try {
         await sendPasswordResetCodeEmail({
           email: email,
@@ -65,8 +65,13 @@ export async function POST(request: NextRequest) {
         });
       } catch (emailError) {
         console.error('Error sending reset code email:', emailError);
-        // Don't fail the request if email fails, but log it
       }
+
+      void emitEmpireActivity({
+        event_type: 'password_reset_request',
+        user_email: email,
+        request,
+      });
     }
 
     // Always return success message (security best practice)
