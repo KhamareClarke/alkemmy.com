@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { resolveCheckoutDiscount } from '@/lib/discounts/resolve-checkout-discount';
 import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
 import { adminSupabase } from '@/lib/admin-supabase';
+import { emitEmpireActivity } from '@/lib/empire-activity';
 
 export async function POST(request: NextRequest) {
   try {
@@ -114,6 +115,31 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    const customerEmail = orderData?.shippingAddress?.email || null;
+    const customerName = orderData?.shippingAddress
+      ? `${orderData.shippingAddress.firstName || ''} ${orderData.shippingAddress.lastName || ''}`.trim()
+      : null;
+
+    void emitEmpireActivity({
+      event_type: paymentIntentId ? 'payment_succeeded' : 'lead_created',
+      user_email: customerEmail,
+      user_id: userId || null,
+      user_name: customerName,
+      message: paymentIntentId
+        ? `Order ${order.order_number} paid (\u00a3${Number(order.total_amount || 0).toFixed(2)})`
+        : `Order ${order.order_number} placed (\u00a3${Number(order.total_amount || 0).toFixed(2)})`,
+      metadata: {
+        order_id: order.id,
+        order_number: order.order_number,
+        total_amount: order.total_amount,
+        payment_method: order.payment_method,
+        payment_intent_id: paymentIntentId || null,
+        item_count: orderItems?.length || 0,
+        discount_code: discountMeta?.discountCode || null,
+      },
+      request,
+    });
 
     return NextResponse.json({
       success: true,

@@ -7,6 +7,7 @@ import { buildSmsBody } from '@/lib/sms/templates';
 import { adminSupabase } from '@/lib/admin-supabase';
 import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
 import type { OrderDiscountMeta } from '@/lib/order-types';
+import { emitEmpireActivity } from '@/lib/empire-activity';
 
 // Ensure this route is always dynamic (no static optimization) so Stripe can reach it
 export const dynamic = 'force-dynamic';
@@ -162,7 +163,6 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
   console.log(`Order ${order.order_number} marked as paid`);
 
-  // Get order details for email
   const { data: orderItems } = await supabase
     .from('order_items')
     .select('*')
@@ -173,6 +173,22 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     .select('*')
     .eq('id', order.shipping_address_id)
     .single();
+
+  void emitEmpireActivity({
+    event_type: 'payment_succeeded',
+    user_email: shippingAddress?.email || null,
+    user_id: order.user_id || null,
+    user_name: shippingAddress ? `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() : null,
+    message: `Order ${order.order_number} paid (\u00a3${Number(order.total_amount || 0).toFixed(2)})`,
+    metadata: {
+      order_id: order.id,
+      order_number: order.order_number,
+      total_amount: order.total_amount,
+      payment_intent_id: paymentIntent.id,
+      amount_received: paymentIntent.amount_received,
+      currency: paymentIntent.currency,
+    },
+  });
 
   // Send confirmation emails
   if (shippingAddress && orderItems) {
@@ -267,6 +283,19 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   }
 
   console.log(`Order ${order.order_number} marked as payment failed`);
+
+  void emitEmpireActivity({
+    event_type: 'payment_failed',
+    user_id: order.user_id || null,
+    message: `Order ${order.order_number} payment failed`,
+    metadata: {
+      order_id: order.id,
+      order_number: order.order_number,
+      total_amount: order.total_amount,
+      payment_intent_id: paymentIntent.id,
+      stripe_error: paymentIntent.last_payment_error?.message || null,
+    },
+  });
 
   if (order.shipping_address_id) {
     const { data: addr } = await supabase
@@ -544,6 +573,23 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         });
       }
     }
+
+    void emitEmpireActivity({
+      event_type: 'payment_succeeded',
+      user_email: shippingAddress?.email || null,
+      user_id: userId || null,
+      user_name: shippingAddress ? `${shippingAddress.first_name || ''} ${shippingAddress.last_name || ''}`.trim() : null,
+      message: `Order ${order.order_number} paid via Stripe Checkout (\u00a3${Number(order.total_amount || 0).toFixed(2)})`,
+      metadata: {
+        order_id: order.id,
+        order_number: order.order_number,
+        total_amount: order.total_amount,
+        currency: session.currency,
+        checkout_session_id: session.id,
+        payment_intent_id: paymentIntentId || null,
+        discount_code: discountMeta?.discountCode || null,
+      },
+    });
 
     console.log(`Order ${order.order_number} created from checkout session ${session.id}`);
   } catch (error) {
