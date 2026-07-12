@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminSupabase } from '@/lib/admin-supabase';
 import { sendContactFormEmail, sendContactFormAdminNotification } from '@/lib/email-service';
+import { emitFleetIngest } from '@/lib/fleet-ingest';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,6 +40,12 @@ export async function POST(request: NextRequest) {
     if (dbError) {
       console.error('Error storing contact message:', dbError);
       // Continue even if database storage fails
+    } else if (contactMessage) {
+      void emitFleetIngest({
+        event_type: 'lead',
+        summary: `Contact form: ${name} (${email}) — ${subject}`,
+        payload: { id: contactMessage.id, name, email, subject },
+      });
     }
 
     // Send confirmation email to user
