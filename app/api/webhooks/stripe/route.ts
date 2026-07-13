@@ -8,6 +8,7 @@ import { adminSupabase } from '@/lib/admin-supabase';
 import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
 import type { OrderDiscountMeta } from '@/lib/order-types';
 import { emitEmpireActivity } from '@/lib/empire-activity';
+import { emitFleetIngest } from '@/lib/fleet-ingest';
 
 // Ensure this route is always dynamic (no static optimization) so Stripe can reach it
 export const dynamic = 'force-dynamic';
@@ -187,6 +188,18 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       payment_intent_id: paymentIntent.id,
       amount_received: paymentIntent.amount_received,
       currency: paymentIntent.currency,
+    },
+  });
+
+  void emitFleetIngest({
+    event_type: 'order',
+    summary: `Order paid: ${order.order_number} — ${shippingAddress?.email || 'guest'} (£${Number(order.total_amount || 0).toFixed(2)})`,
+    payload: {
+      order_id: order.id,
+      order_number: order.order_number,
+      total_amount: order.total_amount,
+      customer_email: shippingAddress?.email || null,
+      payment_intent_id: paymentIntent.id,
     },
   });
 
@@ -588,6 +601,19 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
         checkout_session_id: session.id,
         payment_intent_id: paymentIntentId || null,
         discount_code: discountMeta?.discountCode || null,
+      },
+    });
+
+    void emitFleetIngest({
+      event_type: 'order',
+      summary: `Order paid: ${order.order_number} — ${shippingAddress?.email || 'guest'} (£${Number(order.total_amount || 0).toFixed(2)})`,
+      payload: {
+        order_id: order.id,
+        order_number: order.order_number,
+        total_amount: order.total_amount,
+        customer_email: shippingAddress?.email || null,
+        checkout_session_id: session.id,
+        payment_intent_id: paymentIntentId || null,
       },
     });
 

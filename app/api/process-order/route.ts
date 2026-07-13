@@ -10,6 +10,7 @@ import { resolveCheckoutDiscount } from '@/lib/discounts/resolve-checkout-discou
 import { incrementDiscountCodeUsage } from '@/lib/discounts/increment-discount-usage';
 import { adminSupabase } from '@/lib/admin-supabase';
 import { emitEmpireActivity } from '@/lib/empire-activity';
+import { emitFleetIngest } from '@/lib/fleet-ingest';
 
 export async function POST(request: NextRequest) {
   try {
@@ -139,6 +140,21 @@ export async function POST(request: NextRequest) {
         discount_code: discountMeta?.discountCode || null,
       },
       request,
+    });
+
+    void emitFleetIngest({
+      event_type: 'order',
+      summary: paymentIntentId
+        ? `Order paid: ${order.order_number} — ${customerName || customerEmail || 'guest'} (£${Number(order.total_amount || 0).toFixed(2)})`
+        : `Order placed: ${order.order_number} — ${customerName || customerEmail || 'guest'} (£${Number(order.total_amount || 0).toFixed(2)})`,
+      payload: {
+        order_id: order.id,
+        order_number: order.order_number,
+        total_amount: order.total_amount,
+        customer_email: customerEmail,
+        payment_intent_id: paymentIntentId || null,
+        item_count: orderItems?.length || 0,
+      },
     });
 
     return NextResponse.json({

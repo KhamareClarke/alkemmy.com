@@ -69,6 +69,15 @@ export default function RegisterForm() {
       if (error) {
         setError(error.message);
       } else {
+        void fetch('/api/auth/signup-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+          }),
+        });
         setSuccess('Registration successful! Please check your email to verify your account.');
         setTimeout(() => {
           router.push('/auth/login');
