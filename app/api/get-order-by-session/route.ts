@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { adminSupabase } from '@/lib/admin-supabase';
+import { emitFleetIngest } from '@/lib/fleet-ingest';
 import Stripe from 'stripe';
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, {
@@ -75,6 +77,31 @@ export async function GET(request: NextRequest) {
 
       if (orders) {
         order = orders;
+      }
+    }
+
+    // Backup fleet emit when customer lands on thank-you (Stripe checkout path).
+    if (order && order.payment_status === 'paid' && !(order.notes || '').includes('fleet_ingested')) {
+      const email = order.shipping_address?.email || null;
+      void emitFleetIngest({
+        event_type: 'order',
+        summary: `Order paid: ${order.order_number} — ${email || 'guest'} (£${Number(order.total_amount || 0).toFixed(2)})`,
+        payload: {
+          order_id: order.id,
+          order_number: order.order_number,
+          total_amount: order.total_amount,
+          customer_email: email,
+          checkout_session_id: sessionId,
+          source: 'get-order-by-session',
+        },
+      });
+      try {
+        await adminSupabase
+          .from('orders')
+          .update({ notes: `${order.notes || ''}\nfleet_ingested`.trim() })
+          .eq('id', order.id);
+      } catch {
+        /* best-effort dedupe flag */
       }
     }
 
